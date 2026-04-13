@@ -1,0 +1,87 @@
+version: "3.8"
+
+services:
+  # ── Banco de Dados MySQL 8 ────────────────────────────────────
+  db:
+    image: mysql:8.0
+    container_name: hochheim_db
+    restart: unless-stopped
+    ports:
+      - "3306:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: root123
+      MYSQL_DATABASE: hochheim_spa
+      MYSQL_USER: hochheim_user
+      MYSQL_PASSWORD: hochheim_pass
+    volumes:
+      - ./api/migrations/001_initial_schema.sql:/docker-entrypoint-initdb.d/001_schema.sql
+      - hochheim_data:/var/lib/mysql
+    command: >
+      --default-authentication-plugin=mysql_native_password
+      --character-set-server=utf8mb4
+      --collation-server=utf8mb4_unicode_ci
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-proot123"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  # ── API Backend PHP 8.2 ────────────────────────────────────────
+  # Usa Dockerfile para pré-instalar extensões (build rápido nas próximas execuções)
+  api:
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+    container_name: hochheim_api
+    restart: unless-stopped
+    working_dir: /app
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./api:/app
+    env_file:
+      - ./api/.env
+    depends_on:
+      db:
+        condition: service_healthy
+    command: >
+      sh -c "
+        composer install --no-interaction --optimize-autoloader 2>&1 &&
+        echo '' &&
+        echo '======================================' &&
+        echo '  API: http://localhost:8000' &&
+        echo '  phpMyAdmin: http://localhost:8080' &&
+        echo '  Mailhog: http://localhost:8025' &&
+        echo '======================================' &&
+        php -S 0.0.0.0:8000 router.php
+      "
+
+  # ── phpMyAdmin ────────────────────────────────────────────────
+  phpmyadmin:
+    image: phpmyadmin:latest
+    container_name: hochheim_phpmyadmin
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+    environment:
+      PMA_HOST: db
+      PMA_USER: hochheim_user
+      PMA_PASSWORD: hochheim_pass
+    depends_on:
+      db:
+        condition: service_healthy
+
+  # ── Mailhog (captura e-mails em dev) ──────────────────────────
+  # Interface web: http://localhost:8025
+  # SMTP: mailhog:1025 (configure MAIL_HOST=mailhog no api/.env)
+  mailhog:
+    image: mailhog/mailhog:latest
+    container_name: hochheim_mailhog
+    restart: unless-stopped
+    ports:
+      - "1025:1025"   # SMTP
+      - "8025:8025"   # Web UI
+
+volumes:
+  hochheim_data:

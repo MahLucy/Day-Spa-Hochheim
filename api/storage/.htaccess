@@ -1,0 +1,20 @@
+# Bloqueia listagem de diretórios
+Options -Indexes
+
+# Bloqueia execução de PHP em storage (segurança)
+<FilesMatch "\.php$">
+    Order allow,deny
+    Deny from all
+</FilesMatch>
+
+# Permite acesso público apenas a PDFs, PNGs e XMLs
+<FilesMatch "\.(pdf|png|jpg|xml)$">
+    Order allow,deny
+    Allow from all
+</FilesMatch>
+
+# Bloqueia acesso a logs
+<FilesMatch "\.log$">
+    Order allow,deny
+    Deny from all
+</FilesMatch>

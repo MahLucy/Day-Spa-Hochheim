@@ -1,0 +1,43 @@
+Options -Indexes
+Options -MultiViews
+
+# Bloqueia acesso direto a arquivos sensíveis
+<FilesMatch "(\.env|composer\.(json|lock)|\.htpasswd)$">
+    Order allow,deny
+    Deny from all
+</FilesMatch>
+
+# Bloqueia acesso direto a pastas internas
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteBase /api/
+
+    # Bloqueia acesso direto às pastas internas
+    RewriteRule ^(config|services|models|middleware|helpers|migrations|storage/logs)/ - [F,L]
+
+    # Permite acesso a storage (PDFs, QR Codes)
+    RewriteCond %{REQUEST_URI} ^/api/storage/ [OR]
+    RewriteCond %{REQUEST_URI} ^/storage/
+    RewriteRule ^ - [L]
+
+    # Redireciona tudo para index.php
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteRule ^ index.php [QSA,L]
+</IfModule>
+
+# Cabeçalhos de segurança
+<IfModule mod_headers.c>
+    Header always set X-Content-Type-Options "nosniff"
+    Header always set X-Frame-Options "DENY"
+    Header always set X-XSS-Protection "1; mode=block"
+    Header always set Referrer-Policy "strict-origin-when-cross-origin"
+</IfModule>
+
+# PHP settings
+<IfModule mod_php8.c>
+    php_value upload_max_filesize 10M
+    php_value post_max_size 12M
+    php_value max_execution_time 60
+    php_value memory_limit 256M
+</IfModule>

@@ -1,0 +1,24 @@
+# Ambiente
+.env
+
+# Dependências
+/vendor/
+
+# Storage gerado em runtime
+/storage/qrcodes/*.png
+/storage/pdfs/*.pdf
+/storage/invoices/*.pdf
+/storage/invoices/*.xml
+/storage/logs/*.log
+/storage/rate_limits/
+
+# Uploads
+/storage/images/services/*.jpg
+/storage/images/services/*.jpeg
+/storage/images/services/*.png
+/storage/images/services/*.webp
+
+# IDE
+.idea/
+.vscode/
+*.swp
