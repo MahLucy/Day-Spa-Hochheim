@@ -72,21 +72,26 @@ export default function PaymentPage() {
       // Persiste order_id para a SuccessPage
       try { sessionStorage.setItem('checkout_order_id', String(orderId)) } catch { /* ignora */ }
 
-      // 2. Cria preferência de pagamento no Mercado Pago
+      const isDev = import.meta.env.VITE_APP_ENV !== 'production'
+
+      if (isDev) {
+        // ── Modo desenvolvimento: simula aprovação sem passar pelo MP ──────
+        await api.mockApprovePayment(orderId)
+        // Pequena pausa para o spinner ser visível
+        await new Promise(r => setTimeout(r, 600))
+        window.location.href =
+          `/confirmacao?status=approved&external_reference=${orderId}`
+        return
+      }
+
+      // ── Produção: redireciona para checkout seguro do Mercado Pago ────────
       const prefResponse = await api.createPaymentPreference(orderId)
       const initPoint    = prefResponse.data?.init_point
-      const sandboxPoint = prefResponse.data?.sandbox_init_point
 
       if (!initPoint) throw new Error('Falha ao iniciar pagamento. Tente novamente.')
 
-      // 3. Redireciona para o ambiente seguro do Mercado Pago
-      // Em desenvolvimento (sandbox), usa sandbox_init_point; em produção, init_point
-      const isDev       = import.meta.env.VITE_APP_ENV !== 'production'
-      const redirectUrl = (isDev && sandboxPoint) ? sandboxPoint : initPoint
-
-      // Pequena pausa para o spinner ser visível
       await new Promise(r => setTimeout(r, 400))
-      window.location.href = redirectUrl
+      window.location.href = initPoint
 
     } catch (err) {
       setLoading(false)

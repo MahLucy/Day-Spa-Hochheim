@@ -1,7 +1,7 @@
 import { useCart } from '../../hooks/useCart'
 
 export default function OrderSummary({ className = '' }) {
-  const { items, subtotal, giftCardDiscount, total } = useCart()
+  const { items, subtotal, total } = useCart()
 
   return (
     <div className={`bg-spa-pale rounded-xl3 p-5 ${className}`}>
@@ -24,12 +24,6 @@ export default function OrderSummary({ className = '' }) {
           <span className="text-spa-muted">Subtotal</span>
           <span className="text-spa-dark">R${subtotal}</span>
         </div>
-        {giftCardDiscount > 0 && (
-          <div className="flex justify-between text-sm font-body">
-            <span className="text-spa-muted">Cartão</span>
-            <span className="text-green-600">-R${giftCardDiscount}</span>
-          </div>
-        )}
         <div className="flex justify-between text-base font-body font-semibold border-t border-spa-accent/30 pt-2">
           <span className="text-spa-dark">Total</span>
           <span className="text-spa-dark">R${total}</span>

@@ -81,8 +81,8 @@ function StatsSection() {
     <section className="py-12 lg:py-16 bg-white">
       <div className="w-full px-4 sm:px-8 lg:px-20 xl:px-80 relative">
         <div className="grid grid-cols-3 gap-2 sm:gap-6 divide-x divide-gray-100">
-          {stats.map((s) => (
-            <div key={s.label} className="text-center px-1 sm:px-4">
+          {stats.map((s, idx) => (
+            <div key={idx} className="text-center px-1 sm:px-4">
               <p className="font-display text-xl sm:text-3xl md:text-4xl lg:text-6xl text-spa-dark font-semibold">
                 {s.value}
               </p>

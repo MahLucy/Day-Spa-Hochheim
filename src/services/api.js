@@ -119,6 +119,14 @@ export const api = {
   sendContact(payload) {
     return request('POST', '/contact', payload)
   },
+
+  /**
+   * Simula pagamento aprovado — apenas APP_ENV=development no backend.
+   * Dispara o fluxo completo: Gift Card + e-mail + NFS-e.
+   */
+  mockApprovePayment(orderId) {
+    return request('POST', '/payments/mock-approve', { order_id: orderId })
+  },
 }
 
 // ─── Endpoints admin (requerem Basic Auth) ────────────────────────────────────

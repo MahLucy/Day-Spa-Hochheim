@@ -1,7 +1,8 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { SlidersHorizontal } from 'lucide-react'
 import ServiceCard from '../components/ui/ServiceCard'
-import { services, categories } from '../data/services'
+import { services as localServices, categories } from '../data/services'
+import { api } from '../services/api'
 
 const PRICE_MAX = 250
 
@@ -9,6 +10,32 @@ export default function ServicesPage() {
   const [activeCategory, setActiveCategory] = useState('Todos')
   const [priceRange, setPriceRange] = useState([0, PRICE_MAX])
   const [showFilters, setShowFilters] = useState(false)
+  const [services, setServices] = useState(localServices)
+
+  useEffect(() => {
+    async function fetchServices() {
+      try {
+        const response = await api.getServices()
+        if (response.data && Array.isArray(response.data)) {
+          // Normalize the data format sent from backend to the same format as the frontend components expect
+          const normalized = response.data.map(s => ({
+            id: Number(s.id),
+            name: s.name,
+            category: s.category,
+            description: s.description,
+            price: Number(s.price),
+            duration: `${s.duration_minutes} min`,
+            sessions: `${s.sessions} ${s.sessions > 1 ? 'sessões' : 'sessão'}`,
+            image: s.image_path || 'https://images.unsplash.com/photo-1544161515-4ab6ce6db874?w=400&q=80',
+          }))
+          setServices(normalized)
+        }
+      } catch (err) {
+        console.warn('Usando serviços mock de fallback local.', err)
+      }
+    }
+    fetchServices()
+  }, [])
 
   const filtered = services.filter(s => {
     const catMatch = activeCategory === 'Todos' || s.category === activeCategory

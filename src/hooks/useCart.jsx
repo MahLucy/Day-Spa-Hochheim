@@ -6,7 +6,7 @@ const STORAGE_KEY = 'spa_cart_v1'
 
 function loadFromStorage() {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY)
+    const raw = sessionStorage.getItem(STORAGE_KEY)
     if (!raw) return { items: [], giftCard: null }
     return JSON.parse(raw)
   } catch {
@@ -16,9 +16,9 @@ function loadFromStorage() {
 
 function saveToStorage(items, giftCard) {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ items, giftCard }))
+    sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ items, giftCard }))
   } catch {
-    // localStorage indisponível (modo privado com storage cheio, etc.)
+    // sessionStorage indisponível
   }
 }
 
@@ -58,7 +58,7 @@ export function CartProvider({ children }) {
     setItems([])
     setGiftCardState(null)
     try {
-      localStorage.removeItem(STORAGE_KEY)
+      sessionStorage.removeItem(STORAGE_KEY)
       // Limpa também dados pessoais salvos durante o checkout
       sessionStorage.removeItem('checkout_customer')
       sessionStorage.removeItem('checkout_order_id')
@@ -66,14 +66,13 @@ export function CartProvider({ children }) {
   }, [])
 
   const subtotal        = items.reduce((sum, i) => sum + i.price * i.qty, 0)
-  const giftCardDiscount = giftCard ? 60 : 0
-  const total           = Math.max(0, subtotal - giftCardDiscount)
+  const total           = subtotal
 
   return (
     <CartContext.Provider value={{
       items, addItem, removeItem, updateQty, clearCart,
       giftCard, setGiftCard,
-      subtotal, giftCardDiscount, total,
+      subtotal, total,
       count: items.reduce((s, i) => s + i.qty, 0),
     }}>
       {children}

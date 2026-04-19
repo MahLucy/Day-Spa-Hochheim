@@ -121,7 +121,7 @@ export default function PersonalDataPage() {
       birthdate: form.birthdate && form.birthdate.includes('/')
         ? form.birthdate.split('/').reverse().join('-')
         : (form.birthdate || null),
-      gender:    form.gender,
+      gender:    form.gender === 'Feminino' ? 'F' : form.gender === 'Masculino' ? 'M' : 'O',
       email:     form.email.trim().toLowerCase(),
       phone:     form.phone.replace(/\D/g, ''),
       whatsapp:  form.whatsapp ? form.whatsapp.replace(/\D/g, '') : null,
