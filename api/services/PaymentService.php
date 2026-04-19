@@ -87,7 +87,6 @@ final class PaymentService
                 'failure' => "{$backUrl}/confirmacao",
                 'pending' => "{$backUrl}/confirmacao",
             ],
-            'auto_return'       => 'approved',
             'notification_url'  => env('MP_NOTIFICATION_URL'),
             'external_reference' => (string) $orderId,
             'expires'           => true,
@@ -95,6 +94,12 @@ final class PaymentService
             'expiration_date_to'   => date('c', strtotime('+24 hours')),
             'statement_descriptor' => 'DAY SPA HOCHHEIM',
         ];
+
+        // Mercado Pago strict require: auto_return with HTTP URL fails.
+        // It must be HTTPS.
+        if (str_starts_with($backUrl, 'https://')) {
+            $preferenceData['auto_return'] = 'approved';
+        }
 
         try {
             $client     = new PreferenceClient();
@@ -205,6 +210,61 @@ final class PaymentService
         };
 
         return ['processed' => true, 'order_id' => $orderId];
+    }
+
+    /**
+     * Simula aprovação de pagamento — SOMENTE em desenvolvimento.
+     *
+     * Reproduz exatamente o fluxo do webhook após um pagamento aprovado:
+     * cria o registro de pagamento, atualiza o pedido, gera o Gift Card,
+     * envia e-mail e emite a NFS-e.
+     *
+     * @throws \InvalidArgumentException se pedido não existir
+     */
+    public function mockApprove(int $orderId): void
+    {
+        $order = $this->orderModel->findById($orderId);
+        if (!$order) {
+            throw new \InvalidArgumentException("Pedido #{$orderId} não encontrado.");
+        }
+
+        $mockPaymentId = 'MOCK-' . strtoupper(bin2hex(random_bytes(4))) . '-' . $orderId;
+
+        // Cria ou atualiza registro de pagamento
+        $payment = $this->paymentModel->findByOrderId($orderId);
+
+        if ($payment) {
+            $this->paymentModel->markApproved(
+                (int) $payment['id'],
+                $mockPaymentId,
+                'credit_card',
+                1,
+                ['mock' => true, 'simulated_at' => date('c')]
+            );
+        } else {
+            $paymentId = $this->paymentModel->create($orderId, [
+                'provider'               => 'mock',
+                'provider_preference_id' => 'MOCK_PREF_' . $orderId,
+                'amount'                 => $order['total'],
+            ]);
+            $this->paymentModel->markApproved(
+                $paymentId,
+                $mockPaymentId,
+                'credit_card',
+                1,
+                ['mock' => true, 'simulated_at' => date('c')]
+            );
+        }
+
+        $this->orderModel->updateStatus($orderId, 'paid');
+
+        AppLogger::info('Pagamento mock aprovado (simulação de teste)', [
+            'order_id'      => $orderId,
+            'mock_payment'  => $mockPaymentId,
+        ]);
+
+        // Dispara o mesmo fluxo pós-aprovação do webhook real
+        $this->triggerPostPaymentFlow($orderId);
     }
 
     // ─── Privados ────────────────────────────────────────────────────────────

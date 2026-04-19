@@ -43,6 +43,11 @@ function dispatchRoute(string $method, string $uri): void
         (new \App\Controllers\PaymentController())->webhook();
     }
 
+    // POST /payments/mock-approve  (somente APP_ENV=development)
+    if ($method === 'POST' && $uri === '/payments/mock-approve') {
+        (new \App\Controllers\PaymentController())->mockApprove();
+    }
+
     // POST /invoices/webhook  (NFE.io callback)
     if ($method === 'POST' && $uri === '/invoices/webhook') {
         (new \App\Controllers\InvoiceController())->nfeioWebhook();

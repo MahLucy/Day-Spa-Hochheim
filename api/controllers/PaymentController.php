@@ -49,6 +49,44 @@ final class PaymentController
     }
 
     /**
+     * POST /api/payments/mock-approve
+     *
+     * Simula aprovação de pagamento — disponível APENAS em APP_ENV=development.
+     * Reproduz o fluxo completo do webhook sem passar pelo Mercado Pago.
+     *
+     * Body: { "order_id": 123 }
+     */
+    public function mockApprove(): never
+    {
+        if (env('APP_ENV') !== 'development') {
+            Response::notFound('Rota não encontrada.');
+        }
+
+        $body    = Validator::getJsonBody();
+        $orderId = (int) ($body['order_id'] ?? 0);
+
+        if ($orderId <= 0) {
+            Response::error('order_id inválido.', 400);
+        }
+
+        try {
+            $this->paymentService->mockApprove($orderId);
+            Response::success(
+                ['order_id' => $orderId],
+                'Pagamento simulado com sucesso. Gift Card em processamento.'
+            );
+        } catch (\InvalidArgumentException $e) {
+            Response::notFound($e->getMessage());
+        } catch (\Throwable $e) {
+            AppLogger::error('Erro no mock de pagamento', [
+                'order_id' => $orderId,
+                'error'    => $e->getMessage(),
+            ]);
+            Response::serverError('Erro na simulação: ' . $e->getMessage());
+        }
+    }
+
+    /**
      * POST /api/payments/webhook
      *
      * Endpoint chamado pelo Mercado Pago após evento de pagamento.
