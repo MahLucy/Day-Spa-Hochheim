@@ -81,7 +81,7 @@ $validUntil  = date('d/m/Y', strtotime($giftCard['valid_until']));
 
     <a href="<?= htmlspecialchars($validateUrl, ENT_QUOTES, 'UTF-8') ?>" class="cta">Ver meu Cartão Online</a>
 
-    <p style="font-size:12px;color:#1B7C9F;text-align:center;margin-top:24px;">O PDF do cartão está anexo a este e-mail. Válido por 30 dias a partir da compra.</p>
+    <p style="font-size:12px;color:#1B7C9F;text-align:center;margin-top:24px;">O PDF do cartão está anexo a este e-mail. Válido por 6 meses a partir da compra.</p>
   </div>
 
   <div class="footer">

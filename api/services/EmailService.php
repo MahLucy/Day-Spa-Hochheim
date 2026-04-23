@@ -86,7 +86,6 @@ final class EmailService
                 'order_id' => $orderId,
                 'email'    => $order['customer_email'],
             ]);
-            return true;
         } catch (MailException $e) {
             AppLogger::error('Falha ao enviar e-mail de gift card', [
                 'order_id' => $orderId,
@@ -94,6 +93,58 @@ final class EmailService
             ]);
             throw new \RuntimeException('Falha ao enviar e-mail: ' . $e->getMessage(), 0, $e);
         }
+
+        // Envia cópia ao presenteado (se houver e-mail diferente do comprador)
+        $recipientEmail = $order['recipient_email'] ?? null;
+        if ($recipientEmail && $recipientEmail !== $order['customer_email']) {
+            try {
+                $recipientMail = $this->createMailer();
+                $recipientMail->addAddress($recipientEmail, $order['recipient_name'] ?? 'Presenteado(a)');
+                $recipientMail->Subject = '🎁 Você ganhou um Cartão Presente — Day Spa Hochheim';
+
+                $recipientQrCid = '';
+                if ($giftCard['qr_code_path']) {
+                    $qrPath = $this->resolveStoragePath($giftCard['qr_code_path']);
+                    if (file_exists($qrPath)) {
+                        $recipientQrCid = 'qrcode_' . $giftCard['code'];
+                        $recipientMail->addEmbeddedImage($qrPath, $recipientQrCid, 'qrcode.png', 'base64', 'image/png');
+                    }
+                }
+
+                $recipientOrder = array_merge($order, [
+                    'customer_name' => $order['recipient_name'] ?? 'Você',
+                ]);
+
+                $recipientMail->isHTML(true);
+                $recipientMail->Body = $this->renderTemplate($template, [
+                    'order'    => $recipientOrder,
+                    'giftCard' => $giftCard,
+                    'items'    => $items,
+                    'qrCid'    => $recipientQrCid,
+                ]);
+                $recipientMail->AltBody = $this->buildPlainText($recipientOrder, $giftCard, $items);
+
+                if ($isDigital && $giftCard['pdf_path']) {
+                    $pdfPath = $this->resolveStoragePath($giftCard['pdf_path']);
+                    if (file_exists($pdfPath)) {
+                        $recipientMail->addAttachment($pdfPath, "CartaoPresente-{$giftCard['code']}.pdf");
+                    }
+                }
+
+                $recipientMail->send();
+                AppLogger::info('E-mail de gift card enviado ao presenteado', [
+                    'order_id' => $orderId,
+                    'email'    => $recipientEmail,
+                ]);
+            } catch (\Throwable $e) {
+                AppLogger::error('Falha ao enviar e-mail ao presenteado', [
+                    'order_id' => $orderId,
+                    'error'    => $e->getMessage(),
+                ]);
+            }
+        }
+
+        return true;
     }
 
     /**

@@ -79,7 +79,7 @@ $validUntil = date('d/m/Y', strtotime($giftCard['valid_until']));
     </div>
     <div class="step">
       <div class="step-num">3</div>
-      <div class="step-text">Entregue o cartão para quem você quiser presentear! O recebedor poderá agendar qualquer serviço incluso dentro da validade de 30 dias.</div>
+      <div class="step-text">Entregue o cartão para quem você quiser presentear! O recebedor poderá agendar qualquer serviço incluso dentro da validade de 6 meses.</div>
     </div>
   </div>
 

@@ -65,8 +65,8 @@ final class GiftCardService
         // Gera código único
         $code = CodeGenerator::generateGiftCardCode($this->pdo);
 
-        // Validade: 30 dias corridos
-        $validUntil = new \DateTimeImmutable('+30 days');
+        // Validade: 6 meses corridos
+        $validUntil = new \DateTimeImmutable('+6 months');
 
         // Cria registro no banco
         $giftCardId = $this->giftCardModel->create($orderId, $code, $validUntil);
