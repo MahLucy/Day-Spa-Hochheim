@@ -39,6 +39,139 @@ final class PaymentService
     }
 
     /**
+     * Processa pagamento via Checkout Bricks (checkout transparente).
+     *
+     * Recebe o formData tokenizado do SDK MP no frontend e cria o pagamento
+     * diretamente via PaymentClient. O transaction_amount vem sempre do banco
+     * de dados (nunca confia no valor enviado pelo frontend).
+     *
+     * @param int   $orderId  ID do pedido criado
+     * @param array $formData Dados do formulário Bricks (token, payment_method_id, etc.)
+     */
+    public function processPayment(int $orderId, array $formData): array
+    {
+        $order = $this->orderModel->findById($orderId);
+        if (!$order) {
+            throw new \InvalidArgumentException("Pedido #{$orderId} não encontrado.");
+        }
+        if ($order['status'] !== 'pending') {
+            throw new \RuntimeException("Pedido não está em estado pendente.");
+        }
+
+        $nameParts = explode(' ', trim($order['customer_name'] ?? ''), 2);
+        $cpf       = preg_replace('/\D/', '', $order['customer_cpf'] ?? '');
+
+        // Monta o payload — transaction_amount sempre do banco (segurança)
+        $paymentData = [
+            'transaction_amount' => (float) $order['total'],
+            'description'        => 'Gift Card - Day Spa Hochheim',
+            'external_reference' => (string) $orderId,
+            'notification_url'   => env('MP_NOTIFICATION_URL'),
+            'statement_descriptor' => 'DAY SPA HOCHHEIM',
+            'payer'              => [
+                'email'      => $order['customer_email'],
+                'first_name' => $nameParts[0] ?? '',
+                'last_name'  => $nameParts[1] ?? '',
+            ],
+        ];
+
+        // CPF identificado via banco
+        if (!empty($cpf)) {
+            $paymentData['payer']['identification'] = ['type' => 'CPF', 'number' => $cpf];
+        }
+
+        // Campos seguros do formData do SDK
+        foreach (['payment_method_id', 'token', 'installments', 'issuer_id'] as $field) {
+            if (isset($formData[$field]) && $formData[$field] !== '' && $formData[$field] !== null) {
+                $paymentData[$field] = $formData[$field];
+            }
+        }
+
+        if (isset($paymentData['installments'])) {
+            $paymentData['installments'] = (int) $paymentData['installments'];
+        }
+
+        try {
+            $client  = new PaymentClient();
+            $payment = $client->create($paymentData);
+
+            $mpStatus     = $payment->status     ?? 'unknown';
+            $mpPaymentId  = (string) ($payment->id ?? '');
+            $mpType       = $payment->payment_type_id ?? '';
+            $installments = (int) ($payment->installments ?? 1);
+            $rawArr       = json_decode(json_encode($payment), true) ?? [];
+
+            // Upsert do registro de pagamento
+            $existing  = $this->paymentModel->findByOrderId($orderId);
+            if ($existing) {
+                $paymentDbId = (int) $existing['id'];
+            } else {
+                $paymentDbId = $this->paymentModel->create($orderId, [
+                    'provider'               => 'mercadopago',
+                    'provider_preference_id' => 'bricks-' . $orderId,
+                    'amount'                 => $order['total'],
+                ]);
+            }
+
+            if ($mpStatus === 'approved') {
+                $this->paymentModel->markApproved(
+                    $paymentDbId,
+                    $mpPaymentId,
+                    $this->normalizePaymentMethod($mpType),
+                    $installments,
+                    $rawArr
+                );
+                $this->orderModel->updateStatus($orderId, 'paid');
+
+                AppLogger::info('Pagamento aprovado (checkout bricks)', [
+                    'order_id'   => $orderId,
+                    'payment_id' => $mpPaymentId,
+                    'method'     => $mpType,
+                ]);
+
+                $this->triggerPostPaymentFlow($orderId);
+            } else {
+                $this->paymentModel->updateStatus($paymentDbId, $mpStatus, $rawArr);
+
+                AppLogger::info('Pagamento pendente/recusado (checkout bricks)', [
+                    'order_id'      => $orderId,
+                    'payment_id'    => $mpPaymentId,
+                    'status'        => $mpStatus,
+                    'status_detail' => $payment->status_detail ?? '',
+                ]);
+            }
+
+            $result = [
+                'status'     => $mpStatus,
+                'payment_id' => $mpPaymentId,
+            ];
+
+            // Dados extras para PIX (QR Code) e boleto
+            if ($mpStatus === 'pending') {
+                $qrCode   = $rawArr['point_of_interaction']['transaction_data']['qr_code'] ?? null;
+                $qrBase64 = $rawArr['point_of_interaction']['transaction_data']['qr_code_base64'] ?? null;
+                if ($qrCode) {
+                    $result['qr_code']        = $qrCode;
+                    $result['qr_code_base64'] = $qrBase64;
+                }
+                $boletoUrl = $rawArr['transaction_details']['external_resource_url'] ?? null;
+                if ($boletoUrl) {
+                    $result['boleto_url'] = $boletoUrl;
+                }
+            }
+
+            return $result;
+
+        } catch (\Throwable $e) {
+            AppLogger::error('Erro ao criar pagamento MP (checkout bricks)', [
+                'order_id' => $orderId,
+                'error'    => $e->getMessage(),
+            ]);
+            throw new \RuntimeException('Falha ao processar pagamento: ' . $e->getMessage(), 0, $e);
+        }
+    }
+
+    /**
      * Cria preferência de pagamento no Mercado Pago.
      */
     public function createPreference(int $orderId): array

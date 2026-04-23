@@ -49,6 +49,45 @@ final class PaymentController
     }
 
     /**
+     * POST /api/payments/process
+     *
+     * Processa pagamento via Checkout Bricks (transparente — sem redirect).
+     * Recebe os dados tokenizados do Mercado Pago SDK e cria o pagamento
+     * diretamente na API do MP. Nunca recebe dados raw de cartão.
+     *
+     * Body: { order_id, payment_method_id, token?, installments?, issuer_id?, payer }
+     */
+    public function processPayment(): never
+    {
+        $body    = Validator::getJsonBody();
+        $orderId = (int) ($body['order_id'] ?? 0);
+
+        if ($orderId <= 0) {
+            Response::error('order_id inválido.', 400);
+        }
+
+        // Separa o order_id do restante (formData do SDK)
+        $formData = array_filter($body, static fn($k) => $k !== 'order_id', ARRAY_FILTER_USE_KEY);
+
+        if (empty($formData['payment_method_id'])) {
+            Response::error('Método de pagamento não informado.', 400);
+        }
+
+        try {
+            $result = $this->paymentService->processPayment($orderId, $formData);
+            Response::success($result, 'Pagamento processado.');
+        } catch (\InvalidArgumentException $e) {
+            Response::notFound($e->getMessage());
+        } catch (\RuntimeException $e) {
+            AppLogger::error('Falha ao processar pagamento (bricks)', [
+                'order_id' => $orderId,
+                'error'    => $e->getMessage(),
+            ]);
+            Response::serverError('Falha ao processar pagamento. Tente novamente.');
+        }
+    }
+
+    /**
      * POST /api/payments/mock-approve
      *
      * Simula aprovação de pagamento — disponível APENAS em APP_ENV=development.

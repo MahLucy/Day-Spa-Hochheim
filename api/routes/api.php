@@ -43,6 +43,11 @@ function dispatchRoute(string $method, string $uri): void
         (new \App\Controllers\PaymentController())->webhook();
     }
 
+    // POST /payments/process  (Checkout Bricks — pagamento transparente)
+    if ($method === 'POST' && $uri === '/payments/process') {
+        (new \App\Controllers\PaymentController())->processPayment();
+    }
+
     // POST /payments/mock-approve  (somente APP_ENV=development)
     if ($method === 'POST' && $uri === '/payments/mock-approve') {
         (new \App\Controllers\PaymentController())->mockApprove();
