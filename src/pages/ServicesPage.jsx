@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react'
-import { SlidersHorizontal } from 'lucide-react'
+import { SlidersHorizontal, Info } from 'lucide-react'
 import ServiceCard from '../components/ui/ServiceCard'
-import { services as localServices, categories } from '../data/services'
 import { api } from '../services/api'
 
 const PRICE_MAX = 250
@@ -10,14 +9,16 @@ export default function ServicesPage() {
   const [activeCategory, setActiveCategory] = useState('Todos')
   const [priceRange, setPriceRange] = useState([0, PRICE_MAX])
   const [showFilters, setShowFilters] = useState(false)
-  const [services, setServices] = useState(localServices)
+  const [services, setServices] = useState([])
+  const [categories, setCategories] = useState(['Todos'])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
 
   useEffect(() => {
     async function fetchServices() {
       try {
         const response = await api.getServices()
         if (response.data && Array.isArray(response.data)) {
-          // Normalize the data format sent from backend to the same format as the frontend components expect
           const normalized = response.data.map(s => ({
             id: Number(s.id),
             name: s.name,
@@ -29,9 +30,13 @@ export default function ServicesPage() {
             image: s.image_path || 'https://images.unsplash.com/photo-1544161515-4ab6ce6db874?w=400&q=80',
           }))
           setServices(normalized)
+          const uniqueCategories = ['Todos', ...new Set(normalized.map(s => s.category))]
+          setCategories(uniqueCategories)
         }
       } catch (err) {
-        console.warn('Usando serviços mock de fallback local.', err)
+        setError('Não foi possível carregar os serviços. Tente novamente.')
+      } finally {
+        setLoading(false)
       }
     }
     fetchServices()
@@ -75,6 +80,7 @@ export default function ServicesPage() {
                 setActiveCategory={setActiveCategory}
                 priceRange={priceRange}
                 setPriceRange={setPriceRange}
+                categories={categories}
               />
             </aside>
 
@@ -97,6 +103,7 @@ export default function ServicesPage() {
                     setActiveCategory={setActiveCategory}
                     priceRange={priceRange}
                     setPriceRange={setPriceRange}
+                    categories={categories}
                   />
                 </div>
               )}
@@ -104,22 +111,42 @@ export default function ServicesPage() {
 
             {/* Services grid */}
             <div className="flex-1">
-              <div className="flex items-center justify-between mb-5">
-                <p className="text-sm font-body text-spa-muted">
-                  Exibindo <span className="text-spa-dark font-medium">{filtered.length}</span> serviços
-                </p>
-              </div>
-
-              {filtered.length === 0 ? (
+              {loading ? (
                 <div className="text-center py-16">
-                  <p className="text-spa-muted font-body">Nenhum serviço encontrado.</p>
+                  <p className="text-spa-muted font-body">Carregando serviços...</p>
+                </div>
+              ) : error ? (
+                <div className="text-center py-16">
+                  <p className="text-red-500 font-body">{error}</p>
                 </div>
               ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5">
-                  {filtered.map(s => (
-                    <ServiceCard key={s.id} service={s} />
-                  ))}
-                </div>
+                <>
+                  <div className="flex items-center justify-between mb-5">
+                    <p className="text-sm font-body text-spa-muted">
+                      Exibindo <span className="text-spa-dark font-medium">{filtered.length}</span> serviços
+                    </p>
+                  </div>
+
+                  {/* Aviso compra individual */}
+                  <div className="flex items-start gap-3 mb-6 p-4 bg-amber-50 border border-amber-200 rounded-xl">
+                    <Info size={18} className="text-amber-600 shrink-0 mt-0.5" />
+                    <p className="text-sm font-body text-amber-800 leading-relaxed">
+                      <strong>Atenção:</strong> A compra do cartão presente é individual — somente para 1 pessoa. Não é possível dividir os serviços entre pessoas diferentes (exceto pacotes especiais para casais).
+                    </p>
+                  </div>
+
+                  {filtered.length === 0 ? (
+                    <div className="text-center py-16">
+                      <p className="text-spa-muted font-body">Nenhum serviço encontrado.</p>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5">
+                      {filtered.map(s => (
+                        <ServiceCard key={s.id} service={s} />
+                      ))}
+                    </div>
+                  )}
+                </>
               )}
             </div>
           </div>
@@ -129,7 +156,7 @@ export default function ServicesPage() {
   )
 }
 
-function FilterPanel({ activeCategory, setActiveCategory, priceRange, setPriceRange }) {
+function FilterPanel({ activeCategory, setActiveCategory, priceRange, setPriceRange, categories }) {
   const PRICE_MAX = 250
 
   return (

@@ -3,3 +3,7 @@
 .agents/
 
 node_modules/
+
+cpanel_build/
+deploy_cpanel.zip
+api/scratch/

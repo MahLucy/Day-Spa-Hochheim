@@ -30,7 +30,7 @@ export default function AdminOrders() {
   const [toast, setToast]      = useState('')
   const [resending, setResending] = useState(null)
 
-  const [filters, setFilters]  = useState({ status: '', date_from: '', date_to: '', customer_name: '' })
+  const [filters, setFilters]  = useState({ status: '', date_from: '', date_to: '', customer_name: '', recipient_name: '' })
 
   const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(''), 3000) }
 
@@ -98,12 +98,18 @@ export default function AdminOrders() {
 
       {/* Filtros */}
       <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 mb-6">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           <div className="relative">
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-            <input className="input-field pl-9 text-sm" placeholder="Nome do cliente"
+            <input className="input-field pl-9 text-sm" placeholder="Nome do comprador"
               value={filters.customer_name}
               onChange={e => setFilters(f => ({ ...f, customer_name: e.target.value }))} />
+          </div>
+          <div className="relative">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+            <input className="input-field pl-9 text-sm" placeholder="Nome do presenteado"
+              value={filters.recipient_name}
+              onChange={e => setFilters(f => ({ ...f, recipient_name: e.target.value }))} />
           </div>
           <select className="input-field text-sm" value={filters.status}
             onChange={e => setFilters(f => ({ ...f, status: e.target.value }))}>
@@ -122,7 +128,7 @@ export default function AdminOrders() {
             className="text-sm font-body font-medium bg-spa-dark text-white px-4 py-2 rounded-xl hover:bg-spa-mid transition-all">
             Filtrar
           </button>
-          <button onClick={() => { setFilters({ status: '', date_from: '', date_to: '', customer_name: '' }); load(1) }}
+          <button onClick={() => { setFilters({ status: '', date_from: '', date_to: '', customer_name: '', recipient_name: '' }); load(1) }}
             className="text-sm font-body text-spa-muted px-4 py-2 rounded-xl hover:bg-gray-100 transition-all">
             Limpar
           </button>
@@ -204,13 +210,24 @@ export default function AdminOrders() {
                             </div>
                           </div>
                           <div>
-                            <p className="text-xs font-body font-semibold text-spa-muted uppercase tracking-wider mb-3">Dados do cliente</p>
+                            <p className="text-xs font-body font-semibold text-spa-muted uppercase tracking-wider mb-3">Dados do comprador</p>
                             <div className="space-y-1 text-sm font-body">
                               <p><span className="text-spa-muted">CPF:</span> <span className="text-spa-dark">{d.customer_cpf ?? '—'}</span></p>
                               <p><span className="text-spa-muted">Telefone:</span> <span className="text-spa-dark">{d.customer_phone ?? '—'}</span></p>
                               <p><span className="text-spa-muted">Formato:</span> <span className="text-spa-dark capitalize">{d.gift_card_format ?? '—'}</span></p>
                             </div>
                           </div>
+
+                          {d.recipient_name && (
+                            <div className="sm:col-span-2">
+                              <p className="text-xs font-body font-semibold text-spa-muted uppercase tracking-wider mb-3">Presenteado</p>
+                              <div className="flex flex-wrap gap-4 text-sm font-body p-3 bg-spa-pale rounded-xl border border-spa-accent/20">
+                                <p><span className="text-spa-muted">Nome:</span> <span className="text-spa-dark font-medium">{d.recipient_name}</span></p>
+                                {d.recipient_email && <p><span className="text-spa-muted">E-mail:</span> <span className="text-spa-dark">{d.recipient_email}</span></p>}
+                                {d.recipient_phone && <p><span className="text-spa-muted">Telefone:</span> <span className="text-spa-dark">{d.recipient_phone}</span></p>}
+                              </div>
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>
