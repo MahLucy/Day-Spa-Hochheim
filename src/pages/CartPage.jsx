@@ -1,5 +1,6 @@
+import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { Minus, Plus, Trash2, ChevronRight, ShoppingBag, Gift } from 'lucide-react'
+import { Minus, Plus, Trash2, ChevronRight, ShoppingBag, Gift, X, AlertTriangle } from 'lucide-react'
 import { useCart } from '../hooks/useCart'
 import CheckoutStepper from '../components/ui/CheckoutStepper'
 import OrderSummary from '../components/ui/OrderSummary'
@@ -7,6 +8,18 @@ import OrderSummary from '../components/ui/OrderSummary'
 export default function CartPage() {
   const { items, removeItem, updateQty, giftCard, setGiftCard, total } = useCart()
   const navigate = useNavigate()
+  const [showNotice, setShowNotice] = useState(false)
+
+  useEffect(() => {
+    if (items.length > 0 && !sessionStorage.getItem('cart_notice_seen')) {
+      setShowNotice(true)
+    }
+  }, [items.length])
+
+  const dismissNotice = () => {
+    sessionStorage.setItem('cart_notice_seen', '1')
+    setShowNotice(false)
+  }
 
   if (items.length === 0) {
     return (
@@ -23,6 +36,43 @@ export default function CartPage() {
 
   return (
     <div className="min-h-screen pt-28 pb-12 lg:pt-36 lg:pb-20">
+
+      {/* Popup aviso compra individual */}
+      {showNotice && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-7 relative">
+            <button
+              onClick={dismissNotice}
+              className="absolute top-4 right-4 p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors"
+              aria-label="Fechar"
+            >
+              <X size={18} />
+            </button>
+
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center shrink-0">
+                <AlertTriangle size={20} className="text-amber-600" />
+              </div>
+              <h2 className="font-display text-xl text-spa-dark font-bold">Atenção</h2>
+            </div>
+
+            <p className="text-sm font-body text-spa-muted leading-relaxed mb-2">
+              <strong className="text-spa-dark">A compra do cartão presente é individual — somente para 1 pessoa.</strong>
+            </p>
+            <p className="text-sm font-body text-spa-muted leading-relaxed mb-6">
+              Não é possível dividir os serviços entre pessoas diferentes, exceto pacotes especiais para casais.
+            </p>
+
+            <button
+              onClick={dismissNotice}
+              className="btn-primary w-full py-3 text-sm"
+            >
+              Entendi, continuar
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="page-container">
         <CheckoutStepper currentStep={1} />
 

@@ -56,6 +56,8 @@ final class OrderService
             // Upsert do cliente (por CPF)
             $customerId = $this->customerModel->upsert($customerData);
 
+            $recipient = $options['recipient'] ?? null;
+
             // Cria o pedido
             $orderId = $this->orderModel->create($customerId, [
                 'subtotal'         => number_format($subtotal, 2, '.', ''),
@@ -63,6 +65,9 @@ final class OrderService
                 'total'            => number_format($total, 2, '.', ''),
                 'gift_card_format' => $options['gift_card_format'] ?? 'digital',
                 'notes'            => $options['notes'] ?? null,
+                'recipient_name'   => isset($recipient['name'])  ? trim($recipient['name'])  : null,
+                'recipient_email'  => isset($recipient['email']) ? strtolower(trim($recipient['email'])) : null,
+                'recipient_phone'  => isset($recipient['phone']) ? preg_replace('/\D/', '', $recipient['phone']) : null,
             ]);
 
             // Insere os itens

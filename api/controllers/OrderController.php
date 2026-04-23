@@ -61,6 +61,7 @@ final class OrderController
                 [
                     'gift_card_format' => $body['gift_card_format'] ?? 'digital',
                     'notes'            => $body['notes'] ?? null,
+                    'recipient'        => $body['recipient'] ?? null,
                 ]
             );
 
@@ -97,10 +98,11 @@ final class OrderController
     public function adminIndex(): never
     {
         $filters = [
-            'status'        => $_GET['status'] ?? '',
-            'date_from'     => $_GET['date_from'] ?? '',
-            'date_to'       => $_GET['date_to'] ?? '',
-            'customer_name' => $_GET['customer_name'] ?? '',
+            'status'         => $_GET['status'] ?? '',
+            'date_from'      => $_GET['date_from'] ?? '',
+            'date_to'        => $_GET['date_to'] ?? '',
+            'customer_name'  => $_GET['customer_name'] ?? '',
+            'recipient_name' => $_GET['recipient_name'] ?? '',
         ];
 
         $page   = max(1, (int) ($_GET['page'] ?? 1));

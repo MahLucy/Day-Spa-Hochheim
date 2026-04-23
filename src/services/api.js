@@ -121,6 +121,16 @@ export const api = {
   },
 
   /**
+   * Processa pagamento via Checkout Bricks (checkout transparente).
+   * Envia o formData tokenizado do SDK MP junto com o order_id.
+   * Retorna { status, payment_id, qr_code?, qr_code_base64?, boleto_url? }
+   * @param {{ order_id: number } & object} payload
+   */
+  processPayment(payload) {
+    return request('POST', '/payments/process', payload)
+  },
+
+  /**
    * Simula pagamento aprovado — apenas APP_ENV=development no backend.
    * Dispara o fluxo completo: Gift Card + e-mail + NFS-e.
    */

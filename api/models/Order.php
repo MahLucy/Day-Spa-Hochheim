@@ -44,6 +44,10 @@ final class Order
             $where[]  = 'c.name LIKE ?';
             $params[] = '%' . $filters['customer_name'] . '%';
         }
+        if (!empty($filters['recipient_name'])) {
+            $where[]  = 'o.recipient_name LIKE ?';
+            $params[] = '%' . $filters['recipient_name'] . '%';
+        }
 
         $whereStr = implode(' AND ', $where);
         $params[] = $limit;
@@ -78,6 +82,14 @@ final class Order
             $where[]  = 'o.created_at <= ?';
             $params[] = $filters['date_to'] . ' 23:59:59';
         }
+        if (!empty($filters['customer_name'])) {
+            $where[]  = 'c.name LIKE ?';
+            $params[] = '%' . $filters['customer_name'] . '%';
+        }
+        if (!empty($filters['recipient_name'])) {
+            $where[]  = 'o.recipient_name LIKE ?';
+            $params[] = '%' . $filters['recipient_name'] . '%';
+        }
 
         $stmt = $this->pdo->prepare(
             'SELECT COUNT(*) FROM orders o
@@ -91,8 +103,8 @@ final class Order
     public function create(int $customerId, array $data): int
     {
         $stmt = $this->pdo->prepare(
-            'INSERT INTO orders (customer_id, status, subtotal, discount, total, gift_card_format, notes)
-             VALUES (:customer_id, :status, :subtotal, :discount, :total, :gift_card_format, :notes)'
+            'INSERT INTO orders (customer_id, status, subtotal, discount, total, gift_card_format, notes, recipient_name, recipient_email, recipient_phone)
+             VALUES (:customer_id, :status, :subtotal, :discount, :total, :gift_card_format, :notes, :recipient_name, :recipient_email, :recipient_phone)'
         );
         $stmt->execute([
             ':customer_id'      => $customerId,
@@ -102,6 +114,9 @@ final class Order
             ':total'            => $data['total'],
             ':gift_card_format' => $data['gift_card_format'] ?? 'digital',
             ':notes'            => $data['notes'] ?? null,
+            ':recipient_name'   => $data['recipient_name'] ?? null,
+            ':recipient_email'  => $data['recipient_email'] ?? null,
+            ':recipient_phone'  => $data['recipient_phone'] ?? null,
         ]);
         return (int) $this->pdo->lastInsertId();
     }

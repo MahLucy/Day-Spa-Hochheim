@@ -14,6 +14,7 @@ import {
 const initialForm = {
   name: '', cpf: '', birthdate: '', gender: '',
   email: '', emailConfirm: '', phone: '', whatsapp: '',
+  recipient_name: '', recipient_phone: '', recipient_email: '',
   consent1: false, consent2: false, consent3: false,
 }
 
@@ -73,6 +74,18 @@ export default function PersonalDataPage() {
       case 'gender':
         if (!val) e.gender = 'Selecione o gênero.'
         break
+      case 'recipient_name':
+        if (!String(val).trim()) e.recipient_name = 'Nome do presenteado obrigatório.'
+        else if (String(val).trim().length < 3) e.recipient_name = 'Nome muito curto.'
+        break
+      case 'recipient_email':
+        if (!String(val).trim()) e.recipient_email = 'E-mail do presenteado obrigatório.'
+        else if (!validateEmail(val)) e.recipient_email = 'E-mail inválido.'
+        break
+      case 'recipient_phone':
+        if (!String(val).trim()) e.recipient_phone = 'Telefone do presenteado obrigatório.'
+        else if (!validatePhone(val)) e.recipient_phone = 'Telefone inválido.'
+        break
       default: break
     }
     setErrors(prev => {
@@ -93,8 +106,12 @@ export default function PersonalDataPage() {
     if (!validateEmail(form.email))              e.email        = 'E-mail inválido.'
     if (form.email !== form.emailConfirm)        e.emailConfirm = 'E-mails não coincidem.'
     if (!validatePhone(form.phone))              e.phone        = 'Telefone inválido.'
-    if (!form.gender)                            e.gender       = 'Selecione o gênero.'
-    if (!form.consent1)                          e.consent1     = 'Aceite obrigatório.'
+    if (!form.gender)                                          e.gender          = 'Selecione o gênero.'
+    const rName = sanitize(form.recipient_name)
+    if (!rName || rName.length < 3)                      e.recipient_name  = 'Nome do presenteado obrigatório (mín. 3 caracteres).'
+    if (!validateEmail(form.recipient_email))             e.recipient_email = 'E-mail do presenteado obrigatório.'
+    if (!validatePhone(form.recipient_phone))             e.recipient_phone = 'Telefone do presenteado obrigatório.'
+    if (!form.consent1)                                        e.consent1        = 'Aceite obrigatório.'
     return e
   }
 
@@ -102,7 +119,7 @@ export default function PersonalDataPage() {
     e.preventDefault()
 
     // Marca todos os campos como tocados
-    setTouched({ name: true, cpf: true, birthdate: true, email: true, emailConfirm: true, phone: true, gender: true })
+    setTouched({ name: true, cpf: true, birthdate: true, email: true, emailConfirm: true, phone: true, gender: true, recipient_name: true, recipient_email: true, recipient_phone: true })
 
     const errs = validateAll()
     if (Object.keys(errs).length) {
@@ -127,6 +144,9 @@ export default function PersonalDataPage() {
       whatsapp:  form.whatsapp ? form.whatsapp.replace(/\D/g, '') : null,
       consent2:  form.consent2,
       consent3:  form.consent3,
+      recipient_name:  sanitize(form.recipient_name),
+      recipient_email: form.recipient_email.trim().toLowerCase(),
+      recipient_phone: form.recipient_phone.replace(/\D/g, ''),
     }
 
     try {
@@ -280,8 +300,56 @@ export default function PersonalDataPage() {
                 </div>
               </FormSection>
 
-              {/* Seção 3 — Consentimento */}
-              <FormSection number="3" title="Consentimento">
+              {/* Seção 3 — Presenteado */}
+              <FormSection number="3" title="Para quem será o cartão?">
+                <p className="text-sm font-body text-spa-muted -mt-1">
+                  Informe os dados de quem vai receber o presente. O cartão será enviado por e-mail a essa pessoa também.
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="sm:col-span-2">
+                    <FormField label="Nome do presenteado *" error={errors.recipient_name}>
+                      <input
+                        className={`input-field ${errors.recipient_name ? 'border-red-400 focus:ring-red-400' : ''}`}
+                        placeholder="Nome completo de quem vai receber"
+                        value={form.recipient_name}
+                        onChange={e => set('recipient_name', e.target.value)}
+                        onBlur={() => touch('recipient_name')}
+                        autoComplete="off"
+                        data-field-error={errors.recipient_name || undefined}
+                      />
+                    </FormField>
+                  </div>
+
+                  <FormField label="Telefone do presenteado *" error={errors.recipient_phone}>
+                    <input
+                      className={`input-field ${errors.recipient_phone ? 'border-red-400' : ''}`}
+                      placeholder="(47) 9 0000-0000"
+                      value={form.recipient_phone}
+                      onChange={e => set('recipient_phone', formatPhone(e.target.value))}
+                      onBlur={() => touch('recipient_phone')}
+                      inputMode="numeric"
+                      autoComplete="off"
+                      data-field-error={errors.recipient_phone || undefined}
+                    />
+                  </FormField>
+
+                  <FormField label="E-mail do presenteado *" error={errors.recipient_email}>
+                    <input
+                      type="email"
+                      className={`input-field ${errors.recipient_email ? 'border-red-400' : ''}`}
+                      placeholder="email@dopresenteado.com"
+                      value={form.recipient_email}
+                      onChange={e => set('recipient_email', e.target.value)}
+                      onBlur={() => touch('recipient_email')}
+                      autoComplete="off"
+                      data-field-error={errors.recipient_email || undefined}
+                    />
+                  </FormField>
+                </div>
+              </FormSection>
+
+              {/* Seção 4 — Consentimento */}
+              <FormSection number="4" title="Consentimento">
                 <div className="space-y-3">
                   {[
                     {
