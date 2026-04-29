@@ -74,7 +74,7 @@ final class ServiceController
 
         $validator->validate($data, [
             'name'             => 'required|string|min:2|max:255',
-            'category'         => 'required|in:Massagem,Terapias,Estética,Energia',
+            'category'         => 'required|in:Spa,Massagem,Massagem Spa Terapia,Drenagem Linfática,Banho,Cuidados Especiais,Depilação',
             'price'            => 'required|decimal',
             'duration_minutes' => 'required|int',
             'sessions'         => 'int',
@@ -102,7 +102,7 @@ final class ServiceController
         $validator = new Validator();
         $validator->validate($data, [
             'name'     => 'string|min:2|max:255',
-            'category' => 'in:Massagem,Terapias,Estética,Energia',
+            'category' => 'in:Spa,Massagem,Massagem Spa Terapia,Drenagem Linfática,Banho,Cuidados Especiais,Depilação',
             'price'    => 'decimal',
         ]);
 
@@ -163,8 +163,11 @@ final class ServiceController
         } catch (\InvalidArgumentException $e) {
             Response::error($e->getMessage(), 400);
         } catch (\Throwable $e) {
-            AppLogger::error('Erro ao fazer upload de imagem', ['error' => $e->getMessage()]);
-            Response::serverError('Erro ao salvar imagem.');
+            AppLogger::error('Erro ao fazer upload de imagem', [
+                'error'        => $e->getMessage(),
+                'storage_path' => $this->storage->getStoragePath(),
+            ]);
+            Response::serverError('Erro ao salvar imagem: ' . $e->getMessage());
         }
     }
 }

@@ -45,8 +45,8 @@ $logoUrl = $appUrl . '/logo.png';
       <ul>
         <li>Saldo insuficiente no cartão ou conta</li>
         <li>Dados do cartão incorretos ou expirado</li>
-        <li>Limite de crédito atingido</li>
         <li>Transação bloqueada pelo banco emissor (tente ligar no banco)</li>
+        <li>Pagamento via PIX não realizado no prazo estimado</li>
       </ul>
     </div>
 

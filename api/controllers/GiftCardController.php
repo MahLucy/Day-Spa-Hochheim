@@ -43,17 +43,19 @@ final class GiftCardController
 
         // Remove dados sensíveis do retorno público
         $publicCard = [
-            'code'         => $card['code'],
-            'status'       => $card['status'],
-            'valid_until'  => $card['valid_until'],
-            'redeemed_at'  => $card['redeemed_at'],
-            'created_at'   => $card['created_at'],
-            'format'       => $card['gift_card_format'],
-            'qr_code_url'  => $card['qr_code_path']
+            'code'           => $card['code'],
+            'status'         => $card['status'],
+            'valid_until'    => $card['valid_until'],
+            'redeemed_at'    => $card['redeemed_at'],
+            'created_at'     => $card['created_at'],
+            'format'         => $card['gift_card_format'],
+            'qr_code_url'    => $card['qr_code_path']
                 ? GiftCardService::getPublicUrl($card['qr_code_path'])
                 : null,
-            'items'        => $items,
-            'customer_name' => $card['customer_name'],
+            'items'          => $items,
+            'customer_name'  => $card['customer_name'],
+            'recipient_name' => $card['recipient_name'] ?? null,
+            'total'          => $card['order_total'] ?? null,
         ];
 
         Response::success($publicCard);
@@ -114,7 +116,7 @@ final class GiftCardController
             'status'      => $card['status'],
             'valid_until' => $card['valid_until'],
             'pdf_url'     => $card['pdf_path']
-                ? GiftCardService::getPublicUrl($card['pdf_path'])
+                ? rtrim(env('API_URL'), '/') . '/giftcards/' . $card['code'] . '/pdf'
                 : null,
             'qr_code_url' => $card['qr_code_path']
                 ? GiftCardService::getPublicUrl($card['qr_code_path'])
@@ -141,7 +143,7 @@ final class GiftCardController
         $cards = $this->giftCardModel->findAll($filters, $limit, $offset);
 
         foreach ($cards as &$card) {
-            $card['pdf_url']     = $card['pdf_path'] ? GiftCardService::getPublicUrl($card['pdf_path']) : null;
+            $card['pdf_url']     = $card['pdf_path'] ? rtrim(env('API_URL'), '/') . '/giftcards/' . $card['code'] . '/pdf' : null;
             $card['qr_code_url'] = $card['qr_code_path'] ? GiftCardService::getPublicUrl($card['qr_code_path']) : null;
             $card['items']       = $this->giftCardModel->getItems((int) $card['id']);
         }

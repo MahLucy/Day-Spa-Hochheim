@@ -35,7 +35,6 @@ final class PaymentService
         $this->paymentModel = new Payment($pdo);
 
         MercadoPagoConfig::setAccessToken(env('MP_ACCESS_TOKEN'));
-        MercadoPagoConfig::setRuntimeEnviroment(MercadoPagoConfig::LOCAL);
     }
 
     /**
@@ -69,15 +68,18 @@ final class PaymentService
             'notification_url'   => env('MP_NOTIFICATION_URL'),
             'statement_descriptor' => 'DAY SPA HOCHHEIM',
             'payer'              => [
-                'email'      => $order['customer_email'],
-                'first_name' => $nameParts[0] ?? '',
-                'last_name'  => $nameParts[1] ?? '',
+                'email'       => $order['customer_email'],
+                'first_name'  => $nameParts[0] ?? '',
+                'last_name'   => $nameParts[1] ?? '',
+                'entity_type' => 'individual',
             ],
         ];
 
         // CPF identificado via banco
         if (!empty($cpf)) {
             $paymentData['payer']['identification'] = ['type' => 'CPF', 'number' => $cpf];
+        } else if (isset($formData['payer']['identification'])) {
+            $paymentData['payer']['identification'] = $formData['payer']['identification'];
         }
 
         // Campos seguros do formData do SDK
@@ -89,6 +91,14 @@ final class PaymentService
 
         if (isset($paymentData['installments'])) {
             $paymentData['installments'] = (int) $paymentData['installments'];
+        }
+
+        // Se for PIX, configura o cancelamento automático em 30 minutos pelo Mercado Pago
+        if (isset($paymentData['payment_method_id']) && strtolower($paymentData['payment_method_id']) === 'pix') {
+            $timezone = new \DateTimeZone('America/Sao_Paulo');
+            $expiration = new \DateTime('now', $timezone);
+            $expiration->modify('+30 minutes');
+            $paymentData['date_of_expiration'] = $expiration->format('Y-m-d\TH:i:s.000P');
         }
 
         try {
@@ -162,6 +172,15 @@ final class PaymentService
 
             return $result;
 
+        } catch (\MercadoPago\Exceptions\MPApiException $e) {
+            $apiResp = $e->getApiResponse();
+            AppLogger::error('Erro MP API (checkout bricks)', [
+                'order_id'    => $orderId,
+                'status_code' => $apiResp->getStatusCode(),
+                'mp_response' => $apiResp->getContent(),
+                'message'     => $e->getMessage(),
+            ]);
+            throw new \RuntimeException('Falha ao processar pagamento: ' . $e->getMessage(), 0, $e);
         } catch (\Throwable $e) {
             AppLogger::error('Erro ao criar pagamento MP (checkout bricks)', [
                 'order_id' => $orderId,
