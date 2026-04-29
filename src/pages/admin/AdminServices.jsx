@@ -2,7 +2,7 @@ import { useEffect, useState, useRef } from 'react'
 import { Plus, Pencil, Trash2, ToggleLeft, ToggleRight, Loader2, X, Upload, AlertCircle, Check } from 'lucide-react'
 import { adminApi, ApiError } from '../../services/api'
 
-const CATEGORIES = ['Massagem', 'Terapias', 'Estética', 'Energia']
+const CATEGORIES = ['Spa', 'Massagem', 'Massagem Spa Terapia', 'Drenagem Linfática', 'Banho', 'Cuidados Especiais', 'Depilação']
 const emptyForm  = { name: '', category: CATEGORIES[0], description: '', price: '', duration_minutes: '60', sessions: '1', active: true }
 
 export default function AdminServices() {
@@ -14,7 +14,6 @@ export default function AdminServices() {
   const [form, setForm]         = useState(emptyForm)
   const [formErrors, setFormErrors] = useState({})
   const [toast, setToast]       = useState('')
-  const imageRef = useRef()
 
   const load = async () => {
     setLoading(true)
@@ -120,15 +119,20 @@ export default function AdminServices() {
     }
   }
 
-  const handleImageUpload = async (id) => {
-    const file = imageRef.current?.files?.[0]
+  const handleImageUpload = async (id, event) => {
+    const file = event.target.files?.[0]
     if (!file) return
+    
+    showToast('Enviando imagem...')
+    
     try {
       await adminApi.uploadServiceImage(id, file)
-      showToast('Imagem atualizada.')
+      showToast('Imagem atualizada com sucesso.')
       await load()
     } catch (err) {
       showToast('Erro ao enviar imagem: ' + err.message)
+    } finally {
+      event.target.value = ''
     }
   }
 
@@ -216,8 +220,8 @@ export default function AdminServices() {
                       <div className="flex items-center justify-end gap-2">
                         <label className="cursor-pointer p-2 rounded-lg hover:bg-gray-100 transition-all" title="Upload de imagem">
                           <Upload size={14} className="text-spa-muted" />
-                          <input ref={imageRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden"
-                            onChange={() => handleImageUpload(s.id)} />
+                          <input type="file" accept="image/jpeg,image/png,image/webp" className="hidden"
+                            onChange={(e) => handleImageUpload(s.id, e)} />
                         </label>
                         <button onClick={() => openEdit(s)}
                           className="p-2 rounded-lg hover:bg-spa-pale transition-all" title="Editar">
@@ -322,10 +326,13 @@ export default function AdminServices() {
 
 function CategoryBadge({ category }) {
   const colors = {
-    Massagem:  'bg-purple-50 text-purple-700',
-    Terapias:  'bg-blue-50 text-blue-700',
-    Estética:  'bg-pink-50 text-pink-700',
-    Energia:   'bg-amber-50 text-amber-700',
+    'Spa':                  'bg-teal-50 text-teal-700',
+    'Massagem':             'bg-purple-50 text-purple-700',
+    'Massagem Spa Terapia': 'bg-pink-50 text-pink-700',
+    'Drenagem Linfática':   'bg-blue-50 text-blue-700',
+    'Banho':                'bg-sky-50 text-sky-700',
+    'Cuidados Especiais':   'bg-amber-50 text-amber-700',
+    'Depilação':            'bg-orange-50 text-orange-700',
   }
   return (
     <span className={`text-xs font-body font-medium px-2.5 py-1 rounded-full ${colors[category] ?? 'bg-gray-100 text-gray-600'}`}>

@@ -148,6 +148,11 @@ export default function AdminGiftCards() {
                         Utilizado em {fmtDate(card.redeemed_at)} por {card.redeemed_by ?? '—'}
                       </p>
                     )}
+                    {card.redemption_notes && (
+                      <p className="text-xs font-body text-spa-muted mt-1 bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
+                        <span className="font-semibold text-spa-dark">Obs:</span> {card.redemption_notes}
+                      </p>
+                    )}
                   </div>
 
                   {/* Ações */}
@@ -200,9 +205,9 @@ export default function AdminGiftCards() {
             <div className="p-6 space-y-4">
               <div>
                 <label className="block text-xs font-body font-semibold text-spa-muted mb-1.5">
-                  Registrado por (atendente) *
+                  Utilizado por *
                 </label>
-                <input className="input-field" placeholder="Nome do(a) atendente"
+                <input className="input-field" placeholder="Nome da pessoa que utilizará"
                   value={redeemForm.redeemed_by}
                   onChange={e => setRedeemForm(f => ({ ...f, redeemed_by: e.target.value }))} />
               </div>
