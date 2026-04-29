@@ -25,28 +25,37 @@ function loadMPSdk() {
   })
 }
 
+const isDev = import.meta.env.VITE_APP_ENV === 'development'
+
 export default function PaymentPage() {
   const navigate             = useNavigate()
-  const { items, giftCard, total } = useCart()
+  const { items, giftCard, total, clearCart } = useCart()
   const [phase, setPhase]   = useState('loading') // loading | ready | submitting | error
   const [error, setError]   = useState('')
   const brickRef            = useRef(null)
   const alive               = useRef(true)
+  const isBooting           = useRef(false)
 
   useEffect(() => {
     alive.current = true
     return () => {
       alive.current = false
-      brickRef.current?.unmount?.()
-      brickRef.current = null
+      if (brickRef.current?.unmount) {
+        brickRef.current.unmount()
+        brickRef.current = null
+      }
     }
   }, [])
 
   useEffect(() => {
     if (items.length === 0) return void navigate('/carrinho', { replace: true })
     if (!sessionStorage.getItem('checkout_customer')) return void navigate('/dados-pessoais', { replace: true })
+    
+    if (isBooting.current) return
+    isBooting.current = true
+    
     boot()
-  }, [])
+  }, [items, navigate])
 
   async function boot() {
     setPhase('loading')
@@ -66,13 +75,18 @@ export default function PaymentPage() {
       const mp      = new window.MercadoPago(import.meta.env.VITE_MP_PUBLIC_KEY, { locale: 'pt-BR' })
       const builder = mp.bricks()
 
-      const controller = await builder.create('payment', 'mp-brick-container', {
+        const controller = await builder.create('payment', 'mp-brick-container', {
         initialization: {
           amount: total,
           payer: {
             firstName: nameParts[0] ?? '',
             lastName:  nameParts.slice(1).join(' ') || '',
             email:     customer.email ?? '',
+            entityType: 'individual',
+            identification: {
+              type: 'CPF',
+              number: (customer.cpf ?? '').replace(/\D/g, ''),
+            }
           },
         },
         customization: {
@@ -122,8 +136,10 @@ export default function PaymentPage() {
               const payStatus = payResp.data?.status
 
               if (payStatus === 'approved') {
+                clearCart()
                 window.location.href = `/confirmacao?status=approved&external_reference=${orderId}`
               } else if (payStatus === 'pending') {
+                clearCart()
                 window.location.href = `/confirmacao?status=pending&external_reference=${orderId}`
               } else {
                 throw new Error(payResp.data?.message ?? 'Pagamento não aprovado. Verifique os dados e tente novamente.')
@@ -145,6 +161,35 @@ export default function PaymentPage() {
         setError(err.message ?? 'Falha ao carregar o formulário de pagamento.')
         setPhase('error')
       }
+    }
+  }
+
+  async function handleDevPay() {
+    setPhase('submitting')
+    setError('')
+    try {
+      const raw = sessionStorage.getItem('checkout_customer')
+      if (!raw) return void navigate('/dados-pessoais', { replace: true })
+      const cust = JSON.parse(raw)
+      const { recipient_name, recipient_email, recipient_phone, ...customerCore } = cust
+
+      const orderResp = await api.createOrder({
+        customer:         customerCore,
+        items:            items.map(i => ({ service_id: i.id, quantity: i.qty })),
+        gift_card_format: giftCard === 'printed' ? 'printed' : 'digital',
+        recipient:        { name: recipient_name, email: recipient_email, phone: recipient_phone },
+      })
+
+      const orderId = orderResp.data?.order_id
+      if (!orderId) throw new Error('Falha ao registrar pedido. Tente novamente.')
+      sessionStorage.setItem('checkout_order_id', String(orderId))
+
+      await api.mockApprovePayment(orderId)
+      clearCart()
+      window.location.href = `/confirmacao?status=approved&external_reference=${orderId}`
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : (err.message ?? 'Erro ao simular pagamento.'))
+      setPhase('ready')
     }
   }
 
@@ -224,6 +269,23 @@ export default function PaymentPage() {
                     </button>
                   )}
                 </div>
+              </div>
+            )}
+
+            {/* Painel de simulação — apenas em desenvolvimento */}
+            {isDev && (
+              <div className="mt-6 p-4 border-2 border-dashed border-amber-400 rounded-xl bg-amber-50">
+                <p className="text-xs font-mono font-bold text-amber-700 mb-1">AMBIENTE DE DESENVOLVIMENTO</p>
+                <p className="text-sm text-amber-800 font-body mb-3">
+                  Simula um pagamento aprovado sem passar pelo Mercado Pago.
+                </p>
+                <button
+                  onClick={handleDevPay}
+                  disabled={phase === 'submitting'}
+                  className="w-full py-2.5 px-4 bg-amber-500 hover:bg-amber-600 text-white rounded-xl font-body font-medium text-sm transition-colors disabled:opacity-50"
+                >
+                  Simular pagamento aprovado (TESTE)
+                </button>
               </div>
             )}
 

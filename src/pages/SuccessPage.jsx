@@ -223,7 +223,7 @@ export default function SuccessPage() {
             {[
               { icon: Shield,   label: 'Pagamento seguro' },
               { icon: Mail,     label: 'E-mail enviado' },
-              { icon: Calendar, label: 'Validade: 30 dias' },
+              { icon: Calendar, label: 'Validade: 180 dias' },
             ].map(b => (
               <div key={b.label} className="flex items-center gap-1.5">
                 <b.icon size={13} className="text-spa-light" />

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import {
   ChevronRight,
@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import ServiceCard from "../components/ui/ServiceCard";
 import { services, testimonials } from "../data/services";
+import { api } from "../services/api";
 
 function HeroSection() {
   return (
@@ -40,6 +41,63 @@ function HeroSection() {
         </div>
       </div>
     </section>
+  );
+}
+
+function AnimatedNumber({ value }) {
+  const [count, setCount] = useState(0);
+  const [isVisible, setIsVisible] = useState(false);
+  const nodeRef = useRef(null);
+
+  const match = value.match(/(\d+)(.*)/);
+  const targetNumber = match ? parseInt(match[1], 10) : 0;
+  const suffix = match ? match[2] : "";
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setIsVisible(true);
+          observer.disconnect();
+        }
+      },
+      { threshold: 0.5 }
+    );
+    if (nodeRef.current) {
+      observer.observe(nodeRef.current);
+    }
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
+    if (!isVisible) return;
+    if (targetNumber === 0) {
+      setCount(targetNumber);
+      return;
+    }
+
+    let start = 0;
+    const duration = 2000; // 2 seconds
+    const increment = targetNumber / (duration / 16);
+
+    const timer = setInterval(() => {
+      start += increment;
+      if (start >= targetNumber) {
+        setCount(targetNumber);
+        clearInterval(timer);
+      } else {
+        setCount(Math.floor(start));
+      }
+    }, 16);
+
+    return () => clearInterval(timer);
+  }, [isVisible, targetNumber]);
+
+  return (
+    <span ref={nodeRef}>
+      {count}
+      {suffix}
+    </span>
   );
 }
 
@@ -84,7 +142,7 @@ function StatsSection() {
           {stats.map((s, idx) => (
             <div key={idx} className="text-center px-1 sm:px-4">
               <p className="font-display text-xl sm:text-3xl md:text-4xl lg:text-6xl text-spa-dark font-semibold">
-                {s.value}
+                <AnimatedNumber value={s.value} />
               </p>
               <p className="text-xs sm:text-sm md:text-base lg:text-lg font-subtitle text-spa-dark mt-1 leading-tight">
                 {s.label}
@@ -180,7 +238,34 @@ function ServicesSection() {
 }
 function HighlightsSection() {
   const [idx, setIdx] = useState(0);
-  const highlighted = services.slice(0, 6);
+  const [highlighted, setHighlighted] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchHighlights() {
+      try {
+        const response = await api.getServices();
+        if (response.data && Array.isArray(response.data)) {
+          const normalized = response.data.map((s) => ({
+            id: Number(s.id),
+            name: s.name,
+            category: s.category,
+            description: s.description,
+            price: Number(s.price),
+            duration: `${s.duration_minutes} min`,
+            sessions: `${s.sessions} ${s.sessions > 1 ? "sessões" : "sessão"}`,
+            image: s.image_path || "https://images.unsplash.com/photo-1544161515-4ab6ce6db874?w=400&q=80",
+          }));
+          setHighlighted(normalized.slice(0, 6));
+        }
+      } catch (err) {
+        console.error("Failed to load highlights:", err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchHighlights();
+  }, []);
 
   // Visible cards per breakpoint: 1 mobile, 2 tablet, 3 desktop
   const getVisibleCount = () => {
@@ -243,39 +328,51 @@ function HighlightsSection() {
 
         {/* Cards carousel */}
         <div className="overflow-hidden">
-          <div
-            className="flex transition-transform duration-500 ease-in-out"
-            style={{
-              gap: `${gap}px`,
-              transform: `translateX(calc(-${idx} * (100% / ${visibleCount} + ${gap - gap / visibleCount}px)))`,
-            }}
-          >
-            {highlighted.map((s) => (
-              <div
-                key={s.id}
-                className="shrink-0"
-                style={{
-                  width: `calc((100% - ${gap * (visibleCount - 1)}px) / ${visibleCount})`,
-                }}
-              >
-                <ServiceCard service={s} />
-              </div>
-            ))}
-          </div>
+          {loading ? (
+            <div className="flex justify-center items-center h-[300px]">
+              <p className="text-spa-dark font-body">Carregando destaques...</p>
+            </div>
+          ) : highlighted.length === 0 ? (
+            <div className="flex justify-center items-center h-[300px]">
+              <p className="text-spa-dark font-body">Nenhum serviço em destaque.</p>
+            </div>
+          ) : (
+            <div
+              className="flex transition-transform duration-500 ease-in-out"
+              style={{
+                gap: `${gap}px`,
+                transform: `translateX(calc(-${idx} * (100% / ${visibleCount} + ${gap - gap / visibleCount}px)))`,
+              }}
+            >
+              {highlighted.map((s) => (
+                <div
+                  key={s.id}
+                  className="shrink-0"
+                  style={{
+                    width: `calc((100% - ${gap * (visibleCount - 1)}px) / ${visibleCount})`,
+                  }}
+                >
+                  <ServiceCard service={s} />
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Dot indicators */}
-        <div className="flex justify-center gap-2 mt-6">
-          {Array.from({ length: maxIdx + 1 }).map((_, i) => (
-            <button
-              key={i}
-              onClick={() => setIdx(i)}
-              className={`h-2 rounded-full transition-all duration-300 ${
-                i === idx ? "w-8 bg-spa-dark" : "w-2 bg-gray-300 hover:bg-gray-400"
-              }`}
-            />
-          ))}
-        </div>
+        {!loading && highlighted.length > 0 && (
+          <div className="flex justify-center gap-2 mt-6">
+            {Array.from({ length: maxIdx + 1 }).map((_, i) => (
+              <button
+                key={i}
+                onClick={() => setIdx(i)}
+                className={`h-2 rounded-full transition-all duration-300 ${
+                  i === idx ? "w-8 bg-spa-dark" : "w-2 bg-gray-300 hover:bg-gray-400"
+                }`}
+              />
+            ))}
+          </div>
+        )}
       </div>
     </section>
   );

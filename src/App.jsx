@@ -11,6 +11,7 @@ import PersonalDataPage from './pages/PersonalDataPage'
 import PaymentPage from './pages/PaymentPage'
 import SuccessPage from './pages/SuccessPage'
 import ContactPage from './pages/ContactPage'
+import GiftCardPage from './pages/GiftCardPage'
 
 // Admin pages
 import AdminLogin from './pages/admin/AdminLogin'
@@ -60,6 +61,7 @@ export default function App() {
             <Route path="/pagamento" element={<ScrollToTopPage><PaymentPage /></ScrollToTopPage>} />
             <Route path="/confirmacao" element={<ScrollToTopPage><SuccessPage /></ScrollToTopPage>} />
             <Route path="/contato" element={<ScrollToTopPage><ContactPage /></ScrollToTopPage>} />
+            <Route path="/validar/:code" element={<ScrollToTopPage><GiftCardPage /></ScrollToTopPage>} />
           </Route>
 
           {/* ── Admin routes (standalone layout, no Navbar/Footer) ── */}

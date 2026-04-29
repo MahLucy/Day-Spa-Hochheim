@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react'
-import { SlidersHorizontal, Info } from 'lucide-react'
+import { SlidersHorizontal, Info, Search } from 'lucide-react'
 import ServiceCard from '../components/ui/ServiceCard'
 import { api } from '../services/api'
 
-const PRICE_MAX = 250
+const PRICE_MAX = 1100
 
 export default function ServicesPage() {
+  const [searchQuery, setSearchQuery] = useState('')
   const [activeCategory, setActiveCategory] = useState('Todos')
   const [priceRange, setPriceRange] = useState([0, PRICE_MAX])
   const [showFilters, setShowFilters] = useState(false)
@@ -13,6 +14,13 @@ export default function ServicesPage() {
   const [categories, setCategories] = useState(['Todos'])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [currentPage, setCurrentPage] = useState(1)
+
+  const ITEMS_PER_PAGE = 9
+
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [searchQuery, activeCategory, priceRange])
 
   useEffect(() => {
     async function fetchServices() {
@@ -43,10 +51,27 @@ export default function ServicesPage() {
   }, [])
 
   const filtered = services.filter(s => {
+    const searchMatch = searchQuery === '' || 
+      s.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+      (s.description && s.description.toLowerCase().includes(searchQuery.toLowerCase()))
     const catMatch = activeCategory === 'Todos' || s.category === activeCategory
     const priceMatch = s.price >= priceRange[0] && s.price <= priceRange[1]
-    return catMatch && priceMatch
+    return searchMatch && catMatch && priceMatch
   })
+
+  const totalPages = Math.ceil(filtered.length / ITEMS_PER_PAGE)
+  const paginatedServices = filtered.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE
+  )
+
+  const handlePageChange = (newPage) => {
+    setCurrentPage(newPage)
+    const el = document.getElementById('catalogo')
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }
+  }
 
   return (
     <div className="min-h-screen">
@@ -76,6 +101,8 @@ export default function ServicesPage() {
             {/* Filter sidebar — desktop */}
             <aside className="hidden lg:block w-52 shrink-0">
               <FilterPanel
+                searchQuery={searchQuery}
+                setSearchQuery={setSearchQuery}
                 activeCategory={activeCategory}
                 setActiveCategory={setActiveCategory}
                 priceRange={priceRange}
@@ -99,6 +126,8 @@ export default function ServicesPage() {
               {showFilters && (
                 <div className="mt-4 p-4 bg-white rounded-xl3 shadow-card border border-gray-100">
                   <FilterPanel
+                    searchQuery={searchQuery}
+                    setSearchQuery={setSearchQuery}
                     activeCategory={activeCategory}
                     setActiveCategory={setActiveCategory}
                     priceRange={priceRange}
@@ -140,11 +169,50 @@ export default function ServicesPage() {
                       <p className="text-spa-muted font-body">Nenhum serviço encontrado.</p>
                     </div>
                   ) : (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5">
-                      {filtered.map(s => (
-                        <ServiceCard key={s.id} service={s} />
-                      ))}
-                    </div>
+                    <>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5">
+                        {paginatedServices.map(s => (
+                          <ServiceCard key={s.id} service={s} />
+                        ))}
+                      </div>
+
+                      {/* Paginação */}
+                      {totalPages > 1 && (
+                        <div className="flex flex-wrap items-center justify-center gap-2 mt-12">
+                          <button
+                            onClick={() => handlePageChange(Math.max(currentPage - 1, 1))}
+                            disabled={currentPage === 1}
+                            className="px-4 py-2 text-sm font-body font-medium text-spa-dark bg-spa-pale rounded-xl hover:bg-gray-200 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                          >
+                            Anterior
+                          </button>
+                          
+                          <div className="flex flex-wrap gap-1.5">
+                            {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
+                              <button
+                                key={page}
+                                onClick={() => handlePageChange(page)}
+                                className={`w-9 h-9 flex items-center justify-center text-sm font-body font-medium rounded-xl transition-colors ${
+                                  currentPage === page
+                                    ? 'bg-spa-dark text-white'
+                                    : 'bg-spa-pale text-spa-dark hover:bg-gray-200'
+                                }`}
+                              >
+                                {page}
+                              </button>
+                            ))}
+                          </div>
+
+                          <button
+                            onClick={() => handlePageChange(Math.min(currentPage + 1, totalPages))}
+                            disabled={currentPage === totalPages}
+                            className="px-4 py-2 text-sm font-body font-medium text-spa-dark bg-spa-pale rounded-xl hover:bg-gray-200 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                          >
+                            Próxima
+                          </button>
+                        </div>
+                      )}
+                    </>
                   )}
                 </>
               )}
@@ -156,11 +224,25 @@ export default function ServicesPage() {
   )
 }
 
-function FilterPanel({ activeCategory, setActiveCategory, priceRange, setPriceRange, categories }) {
-  const PRICE_MAX = 250
+function FilterPanel({ searchQuery, setSearchQuery, activeCategory, setActiveCategory, priceRange, setPriceRange, categories }) {
+  const PRICE_MAX = 1100
 
   return (
     <div className="space-y-6">
+      <div>
+        <p className="text-sm font-body font-semibold text-spa-muted uppercase tracking-widest mb-4">Buscar</p>
+        <div className="relative">
+          <input
+            type="text"
+            placeholder="Pesquisar..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full pl-10 pr-4 py-2.5 text-sm font-body bg-spa-pale border border-spa-dark/10 rounded-xl focus:border-spa-dark focus:ring-1 focus:ring-spa-dark transition-all outline-none"
+          />
+          <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-spa-muted" />
+        </div>
+      </div>
+
       <div>
         <p className="text-sm font-body font-semibold text-spa-muted uppercase tracking-widest mb-4">Categoria</p>
         <div className="flex flex-wrap lg:flex-col gap-2">
