@@ -6,4 +6,12 @@ node_modules/
 
 cpanel_build/
 deploy_cpanel.zip
+build_cpanel.zip
+cpanel_build.zip
+deploy_completo.zip
+gerar_build_completo.ps1
 api/scratch/
+api/diag.php
+api/fixperms.php
+api/setup_storage.php
+fix_db.php
