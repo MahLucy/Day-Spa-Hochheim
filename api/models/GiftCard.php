@@ -14,6 +14,7 @@ final class GiftCard
     {
         $stmt = $this->pdo->prepare(
             'SELECT gc.*, o.gift_card_format, o.total AS order_total,
+                    o.recipient_name, o.recipient_email,
                     c.name AS customer_name, c.email AS customer_email
              FROM gift_cards gc
              JOIN orders o ON o.id = gc.order_id

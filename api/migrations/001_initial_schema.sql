@@ -13,7 +13,7 @@ SET SQL_MODE = 'STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVIS
 CREATE TABLE IF NOT EXISTS `services` (
     `id`               INT UNSIGNED    NOT NULL AUTO_INCREMENT,
     `name`             VARCHAR(255)    NOT NULL,
-    `category`         ENUM('Spa',    'Massagem',    'Massagem Spa Terapia',    'Drenagem Linfática',    'Banho',    'Cuidados Especiais',    'Depilação') NOT NULL,
+    `category`         ENUM('Spa','Massagem','Massagem Spa Terapia','Drenagem Linfática','Banho','Cuidados Especiais','Depilação') NOT NULL,
     `description`      TEXT            NULL,
     `price`            DECIMAL(10,2)   NOT NULL,
     `duration_minutes` INT             NOT NULL DEFAULT 60,
@@ -57,6 +57,9 @@ CREATE TABLE IF NOT EXISTS `orders` (
     `total`            DECIMAL(10,2) NOT NULL,
     `gift_card_format` ENUM('digital','printed') NOT NULL DEFAULT 'digital',
     `notes`            TEXT          NULL,
+    `recipient_name`   VARCHAR(255)  NULL,
+    `recipient_email`  VARCHAR(255)  NULL,
+    `recipient_phone`  VARCHAR(20)   NULL,
     `created_at`       DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
     `updated_at`       DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (`id`),
