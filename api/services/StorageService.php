@@ -20,7 +20,7 @@ use App\Helpers\AppLogger;
 final class StorageService
 {
     private const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
-    private const MAX_IMAGE_SIZE      = 5 * 1024 * 1024; // 5 MB
+    private const MAX_IMAGE_SIZE      = 10 * 1024 * 1024; // 10 MB
 
     public function getStoragePath(): string
     {
@@ -43,8 +43,10 @@ final class StorageService
     {
         $this->validateUpload($file);
 
+        $original = pathinfo($file['name'], PATHINFO_FILENAME);
         $ext      = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
-        $filename = $prefix . '_' . time() . '_' . bin2hex(random_bytes(4)) . '.' . $ext;
+        $safe     = preg_replace('/[^a-zA-Z0-9_\-]/', '_', $original);
+        $filename = $safe . '.' . $ext;
         $dir      = $this->ensureDir('images/services');
         $fullPath = $dir . '/' . $filename;
 
@@ -129,15 +131,38 @@ final class StorageService
             throw new \InvalidArgumentException('Imagem muito grande. Máximo: 5 MB.');
         }
 
-        // Valida MIME type real (não confia no $_FILES['type'])
-        $finfo = new \finfo(FILEINFO_MIME_TYPE);
-        $mime  = $finfo->file($file['tmp_name']);
+        $mime = $this->detectMimeType($file['tmp_name']);
 
         if (!in_array($mime, self::ALLOWED_IMAGE_TYPES, true)) {
             throw new \InvalidArgumentException(
                 "Tipo de arquivo não permitido: {$mime}. Use JPEG, PNG ou WebP."
             );
         }
+    }
+
+    private function detectMimeType(string $tmpPath): string
+    {
+        if (class_exists('finfo')) {
+            $finfo = new \finfo(FILEINFO_MIME_TYPE);
+            $mime  = $finfo->file($tmpPath);
+            if ($mime !== false) {
+                return $mime;
+            }
+        }
+
+        if (function_exists('mime_content_type')) {
+            $mime = mime_content_type($tmpPath);
+            if ($mime !== false) {
+                return $mime;
+            }
+        }
+
+        $info = @getimagesize($tmpPath);
+        if ($info !== false && isset($info['mime'])) {
+            return $info['mime'];
+        }
+
+        return 'application/octet-stream';
     }
 
     private function ensureDir(string $subdir): string

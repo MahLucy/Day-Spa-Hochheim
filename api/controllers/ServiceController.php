@@ -139,6 +139,14 @@ final class ServiceController
         }
 
         if (empty($_FILES['image'])) {
+            AppLogger::warning('Upload sem arquivo', [
+                'files_keys'   => array_keys($_FILES),
+                'content_type' => $_SERVER['CONTENT_TYPE'] ?? $_SERVER['HTTP_CONTENT_TYPE'] ?? 'N/A',
+                'file_uploads' => ini_get('file_uploads'),
+                'post_max'     => ini_get('post_max_size'),
+                'upload_max'   => ini_get('upload_max_filesize'),
+                'content_len'  => $_SERVER['CONTENT_LENGTH'] ?? 'N/A',
+            ]);
             Response::error('Nenhuma imagem enviada.', 400);
         }
 
