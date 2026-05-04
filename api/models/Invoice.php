@@ -61,18 +61,28 @@ final class Invoice
     {
         $stmt = $this->pdo->prepare(
             "INSERT INTO invoices (order_id, provider, status)
-             VALUES (:order_id, 'nfeio', 'pending')"
+             VALUES (:order_id, 'focusnfe', 'pending')"
         );
         $stmt->execute([':order_id' => $orderId]);
         return (int) $this->pdo->lastInsertId();
     }
 
+    public function saveFocusRef(int $id, string $ref): bool
+    {
+        $stmt = $this->pdo->prepare(
+            'UPDATE invoices SET focusnfe_ref = ?, provider_invoice_id = ? WHERE id = ?'
+        );
+        $stmt->execute([$ref, $ref, $id]);
+        return $stmt->rowCount() > 0;
+    }
+
     public function markIssued(
-        int    $id,
-        string $providerInvoiceId,
-        string $invoiceNumber,
+        int     $id,
+        string  $providerInvoiceId,
+        string  $invoiceNumber,
         ?string $pdfPath = null,
-        ?string $xmlPath = null
+        ?string $xmlPath = null,
+        ?string $urlDanfse = null
     ): bool {
         $stmt = $this->pdo->prepare(
             'UPDATE invoices
@@ -81,6 +91,7 @@ final class Invoice
                  invoice_number = :invoice_number,
                  pdf_path = :pdf_path,
                  xml_path = :xml_path,
+                 url_danfse = :url_danfse,
                  issued_at = NOW()
              WHERE id = :id'
         );
@@ -90,6 +101,7 @@ final class Invoice
             ':invoice_number'      => $invoiceNumber,
             ':pdf_path'            => $pdfPath,
             ':xml_path'            => $xmlPath,
+            ':url_danfse'          => $urlDanfse,
             ':id'                  => $id,
         ]);
         return $stmt->rowCount() > 0;
@@ -117,8 +129,9 @@ final class Invoice
     {
         $stmt = $this->pdo->prepare(
             "UPDATE invoices
-             SET status = 'pending', provider_invoice_id = NULL, invoice_number = NULL,
-                 error_message = NULL, issued_at = NULL
+             SET status = 'pending', provider_invoice_id = NULL, focusnfe_ref = NULL,
+                 invoice_number = NULL, error_message = NULL, issued_at = NULL,
+                 url_danfse = NULL
              WHERE id = ?"
         );
         $stmt->execute([$id]);

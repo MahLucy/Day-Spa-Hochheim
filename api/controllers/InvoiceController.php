@@ -48,6 +48,31 @@ final class InvoiceController
         Response::success(['invoices' => $invoices]);
     }
 
+    /** GET /api/admin/invoices/:id/status — Consulta status na Focus NFe */
+    public function consultStatus(int $id): never
+    {
+        $invoice = $this->invoiceModel->findById($id);
+        if (!$invoice) {
+            Response::notFound('Nota fiscal não encontrada.');
+        }
+
+        try {
+            $result = $this->invoiceService->consultStatus($id);
+
+            if ($result === null) {
+                Response::error('Não foi possível consultar o status (referência Focus NFe ausente ou token não configurado).', 422);
+            }
+
+            Response::success($result);
+        } catch (\Throwable $e) {
+            AppLogger::error('Erro ao consultar status NFS-e', [
+                'invoice_id' => $id,
+                'error'      => $e->getMessage(),
+            ]);
+            Response::serverError('Falha ao consultar status: ' . $e->getMessage());
+        }
+    }
+
     /** POST /api/admin/invoices/:id/reissue */
     public function reissue(int $id): never
     {
@@ -77,10 +102,10 @@ final class InvoiceController
     }
 
     /**
-     * POST /api/invoices/webhook   (NFE.io webhook — público, sem admin auth)
-     * Registrado como URL de callback no painel NFE.io.
+     * POST /api/invoices/webhook   (Focus NFe webhook — público, sem admin auth)
+     * Configurar a URL no painel Focus NFe como gatilho de notificação.
      */
-    public function nfeioWebhook(): never
+    public function focusnfeWebhook(): never
     {
         $payload = Validator::getJsonBody();
 
@@ -88,7 +113,7 @@ final class InvoiceController
             $processed = $this->invoiceService->processWebhook($payload);
             Response::success(['processed' => $processed]);
         } catch (\Throwable $e) {
-            AppLogger::error('Erro ao processar webhook NFE.io', ['error' => $e->getMessage()]);
+            AppLogger::error('Erro ao processar webhook Focus NFe', ['error' => $e->getMessage()]);
             Response::serverError();
         }
     }
