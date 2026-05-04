@@ -137,6 +137,15 @@ export const api = {
   mockApprovePayment(orderId) {
     return request('POST', '/payments/mock-approve', { order_id: orderId })
   },
+
+  /**
+   * Busca o gift card gerado para um pedido.
+   * Retorna 404 enquanto o pagamento ainda não foi confirmado.
+   * Usado para polling após PIX pendente.
+   */
+  getOrderGiftCard(orderId) {
+    return request('GET', `/orders/${orderId}/giftcard`)
+  },
 }
 
 // ─── Endpoints admin (requerem Basic Auth) ────────────────────────────────────

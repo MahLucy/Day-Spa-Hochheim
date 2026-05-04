@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ChevronLeft, ShieldCheck, Lock, AlertCircle, Info } from 'lucide-react'
+import { ChevronLeft, ShieldCheck, Lock, AlertCircle, Info, Copy, Check } from 'lucide-react'
 import CheckoutStepper from '../components/ui/CheckoutStepper'
 import OrderSummary from '../components/ui/OrderSummary'
 import { useCart } from '../hooks/useCart'
@@ -34,7 +34,10 @@ export default function PaymentPage() {
   const [error, setError]   = useState('')
   const brickRef            = useRef(null)
   const alive               = useRef(true)
-  const isBooting           = useRef(false)
+  const bootIdRef           = useRef(0)   // incremented each boot; lets stale boots self-cancel
+  const [orderId, setOrderId] = useState(null)
+  const [pixData, setPixData]   = useState(null) // { qr_code, qr_code_base64, order_id }
+  const [pixCopied, setPixCopied] = useState(false)
 
   useEffect(() => {
     alive.current = true
@@ -47,27 +50,71 @@ export default function PaymentPage() {
     }
   }, [])
 
+  // Polls /orders/:id/giftcard every 5s while PIX is pending.
+  // Once the gift card exists (payment confirmed via webhook), redirect to success.
+  useEffect(() => {
+    if (phase !== 'pix-pending' || !pixData?.order_id) return
+    const interval = setInterval(async () => {
+      try {
+        await api.getOrderGiftCard(pixData.order_id)
+        clearCart()
+        window.location.href = `/confirmacao?status=approved&external_reference=${pixData.order_id}`
+      } catch {
+        // 404 = still waiting; ignore and keep polling
+      }
+    }, 5000)
+    return () => clearInterval(interval)
+  }, [phase, pixData, clearCart])
+
   useEffect(() => {
     if (items.length === 0) return void navigate('/carrinho', { replace: true })
     if (!sessionStorage.getItem('checkout_customer')) return void navigate('/dados-pessoais', { replace: true })
-    
-    if (isBooting.current) return
-    isBooting.current = true
-    
     boot()
   }, [items, navigate])
 
   async function boot() {
+    // Each boot gets a unique id. If a newer boot starts before this one
+    // finishes an await, the stale boot exits without touching the DOM.
+    const myBootId = ++bootIdRef.current
+    const isStale  = () => myBootId !== bootIdRef.current || !alive.current
+
+    console.log(`[Payment] boot #${myBootId} — orderId já existente: ${orderId ?? 'nenhum'}`)
     setPhase('loading')
     setError('')
 
-    // Desmonta brick anterior se houver (retry)
     brickRef.current?.unmount?.()
     brickRef.current = null
+    const mpContainer = document.getElementById('mp-brick-container')
+    if (mpContainer) mpContainer.innerHTML = ''
 
     try {
       await loadMPSdk()
-      if (!alive.current) return
+      if (isStale()) { console.log(`[Payment] boot #${myBootId} cancelado após loadMPSdk`); return }
+
+      let currentOrderId = orderId
+      if (!currentOrderId) {
+        const raw = sessionStorage.getItem('checkout_customer')
+        if (!raw) return void navigate('/dados-pessoais', { replace: true })
+        const cust = JSON.parse(raw)
+        const { recipient_name, recipient_email, recipient_phone, ...customerCore } = cust
+
+        console.log('[Payment] Criando pedido no backend…')
+        const orderResp = await api.createOrder({
+          customer:         customerCore,
+          items:            items.map(i => ({ service_id: i.id, quantity: i.qty })),
+          gift_card_format: giftCard === 'printed' ? 'printed' : 'digital',
+          recipient:        { name: recipient_name, email: recipient_email, phone: recipient_phone },
+        })
+
+        currentOrderId = orderResp.data?.order_id
+        console.log('[Payment] Pedido criado — order_id:', currentOrderId)
+        if (!currentOrderId) throw new Error('Falha ao registrar pedido. Tente novamente.')
+
+        setOrderId(currentOrderId)
+        sessionStorage.setItem('checkout_order_id', String(currentOrderId))
+      }
+
+      if (isStale()) { console.log(`[Payment] boot #${myBootId} cancelado após criação do pedido`); return }
 
       const customer  = JSON.parse(sessionStorage.getItem('checkout_customer') ?? '{}')
       const nameParts = (customer.name ?? '').split(' ')
@@ -75,7 +122,7 @@ export default function PaymentPage() {
       const mp      = new window.MercadoPago(import.meta.env.VITE_MP_PUBLIC_KEY, { locale: 'pt-BR' })
       const builder = mp.bricks()
 
-        const controller = await builder.create('payment', 'mp-brick-container', {
+      const controller = await builder.create('payment', 'mp-brick-container', {
         initialization: {
           amount: total,
           payer: {
@@ -91,10 +138,11 @@ export default function PaymentPage() {
         },
         customization: {
           paymentMethods: {
-            creditCard:   'all',
-            debitCard:    'all',
-            ticket:       'all', // boleto
-            bankTransfer: 'all', // PIX
+            creditCard:      'all',
+            debitCard:       'all',
+            ticket:          'all', // boleto
+            bankTransfer:    'all', // PIX
+            maxInstallments: 3,
           },
         },
         callbacks: {
@@ -102,49 +150,95 @@ export default function PaymentPage() {
             if (alive.current) setPhase('ready')
           },
           onError: (err) => {
-            console.error('[MP Brick]', err)
+            console.group('[MP Brick] onError')
+            console.error('type:', err?.type)
+            console.error('cause:', err?.cause)
+            console.error('field:', err?.field)
+            console.error('raw:', err)
+            console.groupEnd()
             if (alive.current) {
               setError('Erro no formulário de pagamento. Tente recarregar a página.')
               setPhase('error')
             }
           },
-          onSubmit: async ({ formData }) => {
+          onSubmit: async ({ formData, additionalData }) => {
             if (!alive.current) return
             setPhase('submitting')
             setError('')
 
-            try {
-              const raw = sessionStorage.getItem('checkout_customer')
-              if (!raw) return void navigate('/dados-pessoais', { replace: true })
-              const cust = JSON.parse(raw)
-              const { recipient_name, recipient_email, recipient_phone, ...customerCore } = cust
+            console.group('[Payment] onSubmit — iniciando pagamento')
+            console.log('order_id:', currentOrderId)
+            console.log('payment_method_id:', formData?.payment_method_id)
+            console.log('payment_type (additionalData):', additionalData?.paymentTypeId)
+            console.log('payment_type (formData):', formData?.payment_type)
+            console.log('installments:', formData?.installments)
+            console.log('issuer_id:', formData?.issuer_id)
+            console.log('has token:', !!formData?.token)
+            console.log('tracks:', formData?.tracks)
+            console.groupEnd()
 
-              // 1. Cria o pedido
-              const orderResp = await api.createOrder({
-                customer:         customerCore,
-                items:            items.map(i => ({ service_id: i.id, quantity: i.qty })),
-                gift_card_format: giftCard === 'printed' ? 'printed' : 'digital',
-                recipient:        { name: recipient_name, email: recipient_email, phone: recipient_phone },
+            try {
+              const storedOrderId = currentOrderId
+              if (!storedOrderId) {
+                console.error('[Payment] Sem storedOrderId — redirecionando para dados-pessoais')
+                navigate('/dados-pessoais', { replace: true })
+                return
+              }
+
+              const payload = {
+                order_id: storedOrderId,
+                ...formData,
+                payment_type: additionalData?.paymentTypeId || formData.payment_type || 'credit_card',
+              }
+              console.log('[Payment] Enviando para /payments/process:', {
+                order_id:          payload.order_id,
+                payment_method_id: payload.payment_method_id,
+                payment_type:      payload.payment_type,
+                installments:      payload.installments,
+                has_token:         !!payload.token,
               })
 
-              const orderId = orderResp.data?.order_id
-              if (!orderId) throw new Error('Falha ao registrar pedido. Tente novamente.')
-              sessionStorage.setItem('checkout_order_id', String(orderId))
-
-              // 2. Processa o pagamento via checkout transparente
-              const payResp  = await api.processPayment({ order_id: orderId, ...formData })
+              const payResp   = await api.processPayment(payload)
               const payStatus = payResp.data?.status
+
+              console.group('[Payment] Resposta do backend')
+              console.log('status:', payStatus)
+              console.log('payment_id:', payResp.data?.payment_id)
+              console.log('status_detail:', payResp.data?.status_detail)
+              console.log('message:', payResp.data?.message)
+              console.log('has qr_code:', !!payResp.data?.qr_code)
+              console.log('full response:', payResp)
+              console.groupEnd()
 
               if (payStatus === 'approved') {
                 clearCart()
-                window.location.href = `/confirmacao?status=approved&external_reference=${orderId}`
+                window.location.href = `/confirmacao?status=approved&external_reference=${storedOrderId}`
               } else if (payStatus === 'pending') {
-                clearCart()
-                window.location.href = `/confirmacao?status=pending&external_reference=${orderId}`
+                if (payResp.data?.qr_code) {
+                  // PIX — show QR code inline; unmount brick to avoid MP SVG render errors
+                  setPixData({
+                    qr_code:        payResp.data.qr_code,
+                    qr_code_base64: payResp.data.qr_code_base64 ?? null,
+                    order_id:       storedOrderId,
+                  })
+                  brickRef.current?.unmount?.()
+                  brickRef.current = null
+                  setPhase('pix-pending')
+                } else {
+                  // Boleto or other pending payment — redirect to confirmation
+                  clearCart()
+                  window.location.href = `/confirmacao?status=pending&external_reference=${storedOrderId}`
+                }
               } else {
                 throw new Error(payResp.data?.message ?? 'Pagamento não aprovado. Verifique os dados e tente novamente.')
               }
             } catch (err) {
+              console.group('[Payment] ERRO no processamento')
+              console.error('message:', err?.message)
+              console.error('status HTTP:', err?.status)
+              console.error('errors:', err?.errors)
+              console.error('raw:', err)
+              console.groupEnd()
               if (alive.current) {
                 setError(err instanceof ApiError ? err.message : (err.message ?? 'Erro ao processar pagamento.'))
                 setPhase('ready')
@@ -155,9 +249,16 @@ export default function PaymentPage() {
         },
       })
 
-      if (alive.current) brickRef.current = controller
+      if (isStale()) {
+        console.log(`[Payment] boot #${myBootId} cancelado após builder.create`)
+        controller.unmount()
+        return
+      }
+      console.log(`[Payment] boot #${myBootId} — MP Brick montado com sucesso`)
+      brickRef.current = controller
     } catch (err) {
-      if (alive.current) {
+      console.error('[Payment] Erro no boot:', err)
+      if (!isStale()) {
         setError(err.message ?? 'Falha ao carregar o formulário de pagamento.')
         setPhase('error')
       }
@@ -168,29 +269,41 @@ export default function PaymentPage() {
     setPhase('submitting')
     setError('')
     try {
-      const raw = sessionStorage.getItem('checkout_customer')
-      if (!raw) return void navigate('/dados-pessoais', { replace: true })
-      const cust = JSON.parse(raw)
-      const { recipient_name, recipient_email, recipient_phone, ...customerCore } = cust
+      // FIX: reutiliza orderId existente se disponível (mesmo padrão do boot)
+      let currentOrderId = orderId
+      if (!currentOrderId) {
+        const raw = sessionStorage.getItem('checkout_customer')
+        if (!raw) return void navigate('/dados-pessoais', { replace: true })
+        const cust = JSON.parse(raw)
+        const { recipient_name, recipient_email, recipient_phone, ...customerCore } = cust
 
-      const orderResp = await api.createOrder({
-        customer:         customerCore,
-        items:            items.map(i => ({ service_id: i.id, quantity: i.qty })),
-        gift_card_format: giftCard === 'printed' ? 'printed' : 'digital',
-        recipient:        { name: recipient_name, email: recipient_email, phone: recipient_phone },
-      })
+        const orderResp = await api.createOrder({
+          customer:         customerCore,
+          items:            items.map(i => ({ service_id: i.id, quantity: i.qty })),
+          gift_card_format: giftCard === 'printed' ? 'printed' : 'digital',
+          recipient:        { name: recipient_name, email: recipient_email, phone: recipient_phone },
+        })
 
-      const orderId = orderResp.data?.order_id
-      if (!orderId) throw new Error('Falha ao registrar pedido. Tente novamente.')
-      sessionStorage.setItem('checkout_order_id', String(orderId))
+        currentOrderId = orderResp.data?.order_id
+        if (!currentOrderId) throw new Error('Falha ao registrar pedido. Tente novamente.')
+        setOrderId(currentOrderId)
+        sessionStorage.setItem('checkout_order_id', String(currentOrderId))
+      }
 
-      await api.mockApprovePayment(orderId)
+      await api.mockApprovePayment(currentOrderId)
       clearCart()
-      window.location.href = `/confirmacao?status=approved&external_reference=${orderId}`
+      window.location.href = `/confirmacao?status=approved&external_reference=${currentOrderId}`
     } catch (err) {
       setError(err instanceof ApiError ? err.message : (err.message ?? 'Erro ao simular pagamento.'))
       setPhase('ready')
     }
+  }
+
+  function handleCopyPix() {
+    navigator.clipboard.writeText(pixData.qr_code).then(() => {
+      setPixCopied(true)
+      setTimeout(() => setPixCopied(false), 3000)
+    })
   }
 
   return (
@@ -243,8 +356,65 @@ export default function PaymentPage() {
             {/* Container do Brick — sempre no DOM para o SDK montar */}
             <div
               id="mp-brick-container"
-              className={phase === 'loading' ? 'h-0 overflow-hidden' : ''}
+              className={phase === 'loading' || phase === 'pix-pending' ? 'h-0 overflow-hidden' : ''}
             />
+
+            {/* PIX — QR Code inline */}
+            {phase === 'pix-pending' && pixData && (
+              <div className="bg-white rounded-2xl p-6 shadow-card border border-green-100">
+                <div className="flex items-center gap-2 mb-5">
+                  <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center shrink-0">
+                    <Check size={16} className="text-green-600" />
+                  </div>
+                  <div>
+                    <p className="font-body font-semibold text-spa-dark text-sm">PIX gerado com sucesso!</p>
+                    <p className="text-xs text-spa-muted font-body">Válido por 30 minutos</p>
+                  </div>
+                </div>
+
+                {pixData.qr_code_base64 && (
+                  <div className="flex justify-center mb-4">
+                    <img
+                      src={`data:image/png;base64,${pixData.qr_code_base64}`}
+                      alt="QR Code PIX"
+                      className="w-48 h-48 border border-gray-200 rounded-xl"
+                    />
+                  </div>
+                )}
+
+                <p className="text-xs text-center text-spa-muted font-body mb-2">
+                  ou use o <strong>Pix Copia e Cola:</strong>
+                </p>
+                <div className="flex items-center gap-2 p-3 bg-gray-50 border border-gray-200 rounded-xl">
+                  <code className="flex-1 text-xs text-spa-dark font-mono break-all leading-relaxed">
+                    {pixData.qr_code}
+                  </code>
+                  <button
+                    onClick={handleCopyPix}
+                    className="shrink-0 p-2 rounded-lg bg-white border border-gray-200 hover:border-spa-accent transition-colors"
+                    title="Copiar código PIX"
+                  >
+                    {pixCopied
+                      ? <Check size={14} className="text-green-600" />
+                      : <Copy size={14} className="text-spa-muted" />
+                    }
+                  </button>
+                </div>
+                {pixCopied && (
+                  <p className="mt-1.5 text-center text-xs text-green-600 font-body">Código copiado!</p>
+                )}
+
+                <div className="mt-4 flex items-center gap-2 p-3 bg-amber-50 border border-amber-100 rounded-xl">
+                  <svg className="animate-spin w-3.5 h-3.5 shrink-0 text-amber-500" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+                  </svg>
+                  <p className="text-xs font-body text-amber-700">
+                    Aguardando confirmação do pagamento… Esta página atualiza automaticamente.
+                  </p>
+                </div>
+              </div>
+            )}
 
             {/* Overlay de processamento */}
             {phase === 'submitting' && (
@@ -275,10 +445,17 @@ export default function PaymentPage() {
             {/* Painel de simulação — apenas em desenvolvimento */}
             {isDev && (
               <div className="mt-6 p-4 border-2 border-dashed border-amber-400 rounded-xl bg-amber-50">
-                <p className="text-xs font-mono font-bold text-amber-700 mb-1">AMBIENTE DE DESENVOLVIMENTO</p>
-                <p className="text-sm text-amber-800 font-body mb-3">
-                  Simula um pagamento aprovado sem passar pelo Mercado Pago.
-                </p>
+                <p className="text-xs font-mono font-bold text-amber-700 mb-2">AMBIENTE DE DESENVOLVIMENTO</p>
+
+                {/* Dados do cartão de teste (sandbox MP) */}
+                <div className="mb-3 p-3 bg-white border border-amber-300 rounded-lg font-mono text-xs text-amber-900 space-y-0.5">
+                  <p className="font-bold text-amber-700 mb-1">Cartão de teste (sandbox):</p>
+                  <p><span className="text-amber-500">Número:</span> 5031 4332 1540 6351</p>
+                  <p><span className="text-amber-500">Nome do titular:</span> <strong>APRO</strong> (obrigatório para aprovar)</p>
+                  <p><span className="text-amber-500">Validade:</span> qualquer data futura</p>
+                  <p><span className="text-amber-500">CVV:</span> 123</p>
+                </div>
+
                 <button
                   onClick={handleDevPay}
                   disabled={phase === 'submitting'}
