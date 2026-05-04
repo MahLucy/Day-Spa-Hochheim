@@ -35,7 +35,7 @@ export default function ServicesPage() {
             price: Number(s.price),
             duration: `${s.duration_minutes} min`,
             sessions: `${s.sessions} ${s.sessions > 1 ? 'sessões' : 'sessão'}`,
-            image: s.image_path || 'https://images.unsplash.com/photo-1544161515-4ab6ce6db874?w=400&q=80',
+            image: s.image_url || 'https://images.unsplash.com/photo-1544161515-4ab6ce6db874?w=400&q=80',
           }))
           setServices(normalized)
           const uniqueCategories = ['Todos', ...new Set(normalized.map(s => s.category))]
