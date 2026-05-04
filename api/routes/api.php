@@ -53,9 +53,9 @@ function dispatchRoute(string $method, string $uri): void
         (new \App\Controllers\PaymentController())->mockApprove();
     }
 
-    // POST /invoices/webhook  (NFE.io callback)
+    // POST /invoices/webhook  (Focus NFe callback — configurar como gatilho no painel)
     if ($method === 'POST' && $uri === '/invoices/webhook') {
-        (new \App\Controllers\InvoiceController())->nfeioWebhook();
+        (new \App\Controllers\InvoiceController())->focusnfeWebhook();
     }
 
     // POST /contact
@@ -155,6 +155,10 @@ function dispatchAdminRoute(string $method, string $uri): void
 
     if ($method === 'POST' && preg_match('#^/invoices/(\d+)/reissue$#', $adminUri, $m)) {
         (new \App\Controllers\InvoiceController())->reissue((int) $m[1]);
+    }
+
+    if ($method === 'GET' && preg_match('#^/invoices/(\d+)/status$#', $adminUri, $m)) {
+        (new \App\Controllers\InvoiceController())->consultStatus((int) $m[1]);
     }
 
     // ── Relatórios ────────────────────────────────────────────────────────────

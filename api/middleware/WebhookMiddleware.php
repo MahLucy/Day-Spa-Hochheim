@@ -50,36 +50,59 @@ final class WebhookMiddleware
         $now    = time();
         $window = self::RATE_LIMIT_WINDOW;
 
-        $data = ['calls' => [], 'blocked_until' => 0];
-
-        if (file_exists($lockFile)) {
-            $raw = @file_get_contents($lockFile);
-            if ($raw) {
-                $data = json_decode($raw, true) ?? $data;
-            }
+        // FIX: race condition (TOCTOU) corrigida.
+        // A implementação anterior usava file_get_contents() sem lock exclusivo, o que
+        // permitia que duas requisições simultâneas do MP lessem o mesmo estado e ambas
+        // passassem pelo rate limit antes de qualquer uma escrever o valor atualizado.
+        // Agora o flock(LOCK_EX) garante acesso atômico: leitura e escrita dentro do
+        // mesmo lock, sem janela de corrida entre os dois.
+        $fp = @fopen($lockFile, 'c+');
+        if (!$fp) {
+            // Sem acesso ao arquivo de lock → não bloqueia (fail-open consciente)
+            AppLogger::warning('Webhook rate limit: não foi possível abrir arquivo de lock', [
+                'ip'   => $ip,
+                'file' => $lockFile,
+            ]);
+            return;
         }
+
+        flock($fp, LOCK_EX); // bloqueia leitura E escrita até liberar
+
+        $raw  = stream_get_contents($fp);
+        $data = $raw ? (json_decode($raw, true) ?? []) : [];
+        $data += ['calls' => [], 'blocked_until' => 0];
 
         // Ainda bloqueado?
         if ($data['blocked_until'] > $now) {
+            flock($fp, LOCK_UN);
+            fclose($fp);
             AppLogger::warning('Webhook rate limit ativo', ['ip' => $ip]);
             http_response_code(429);
             header('Retry-After: ' . ($data['blocked_until'] - $now));
             Response::error('Too Many Requests', 429);
         }
 
-        // Remove chamadas fora da janela
-        $data['calls'] = array_filter($data['calls'], fn($ts) => $ts > $now - $window);
+        // Remove chamadas fora da janela e registra a atual
+        $data['calls'] = array_values(
+            array_filter($data['calls'], fn($ts) => $ts > $now - $window)
+        );
         $data['calls'][] = $now;
 
         if (count($data['calls']) > self::RATE_LIMIT_CALLS) {
             $data['blocked_until'] = $now + $window;
-            @file_put_contents($lockFile, json_encode($data), LOCK_EX);
+            rewind($fp); ftruncate($fp, 0);
+            fwrite($fp, json_encode($data));
+            flock($fp, LOCK_UN);
+            fclose($fp);
             AppLogger::warning('Webhook rate limit excedido', ['ip' => $ip]);
             http_response_code(429);
             Response::error('Too Many Requests', 429);
         }
 
-        @file_put_contents($lockFile, json_encode($data), LOCK_EX);
+        rewind($fp); ftruncate($fp, 0);
+        fwrite($fp, json_encode($data));
+        flock($fp, LOCK_UN);
+        fclose($fp);
     }
 
     private static function getRateLimitDir(): string
