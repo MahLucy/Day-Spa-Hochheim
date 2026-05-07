@@ -20,15 +20,18 @@ use PDO;
  */
 final class EmailService
 {
-    private PDO      $pdo;
-    private Order    $orderModel;
-    private GiftCard $giftCardModel;
+    private ?PDO      $pdo          = null;
+    private ?Order    $orderModel   = null;
+    private ?GiftCard $giftCardModel = null;
 
-    public function __construct()
+    private function db(): PDO
     {
-        $this->pdo          = \Database::getInstance();
-        $this->orderModel   = new Order($this->pdo);
-        $this->giftCardModel = new GiftCard($this->pdo);
+        if ($this->pdo === null) {
+            $this->pdo          = \Database::getInstance();
+            $this->orderModel   = new Order($this->pdo);
+            $this->giftCardModel = new GiftCard($this->pdo);
+        }
+        return $this->pdo;
     }
 
     /**
@@ -36,6 +39,7 @@ final class EmailService
      */
     public function sendGiftCard(int $orderId): bool
     {
+        $this->db();
         $order    = $this->orderModel->findById($orderId);
         $giftCard = $this->giftCardModel->findByOrderId($orderId);
 
@@ -94,13 +98,13 @@ final class EmailService
             throw new \RuntimeException('Falha ao enviar e-mail: ' . $e->getMessage(), 0, $e);
         }
 
-        // Envia cópia ao presenteado (se houver e-mail diferente do comprador)
+        // Envia e-mail celebratório ao presenteado (se houver e-mail diferente do comprador)
         $recipientEmail = $order['recipient_email'] ?? null;
         if ($recipientEmail && $recipientEmail !== $order['customer_email']) {
             try {
                 $recipientMail = $this->createMailer();
                 $recipientMail->addAddress($recipientEmail, $order['recipient_name'] ?? 'Presenteado(a)');
-                $recipientMail->Subject = '🎁 Você ganhou um Cartão Presente — Day Spa Hochheim';
+                $recipientMail->Subject = '🎁 Parabéns! Você ganhou um Cartão Presente — Day Spa Hochheim';
 
                 $recipientQrCid = '';
                 if ($giftCard['qr_code_path']) {
@@ -111,18 +115,20 @@ final class EmailService
                     }
                 }
 
+                // order para o presenteado: customer_name = nome do presenteado, sender_name = nome do comprador
                 $recipientOrder = array_merge($order, [
                     'customer_name' => $order['recipient_name'] ?? 'Você',
+                    'sender_name'   => $order['customer_name'],
                 ]);
 
                 $recipientMail->isHTML(true);
-                $recipientMail->Body = $this->renderTemplate($template, [
+                $recipientMail->Body = $this->renderTemplate('giftcard-recipient', [
                     'order'    => $recipientOrder,
                     'giftCard' => $giftCard,
                     'items'    => $items,
                     'qrCid'    => $recipientQrCid,
                 ]);
-                $recipientMail->AltBody = $this->buildPlainText($recipientOrder, $giftCard, $items);
+                $recipientMail->AltBody = $this->buildRecipientPlainText($recipientOrder, $giftCard, $items);
 
                 if ($isDigital && $giftCard['pdf_path']) {
                     $pdfPath = $this->resolveStoragePath($giftCard['pdf_path']);
@@ -152,6 +158,7 @@ final class EmailService
      */
     public function sendOrderConfirmation(int $orderId): bool
     {
+        $this->db();
         $order = $this->orderModel->findById($orderId);
         if (!$order) {
             throw new \InvalidArgumentException("Pedido #$orderId não encontrado.");
@@ -217,7 +224,7 @@ final class EmailService
         // Reply-to do visitante
         $mail->addReplyTo($data['email'], $data['name']);
 
-        $mail->Subject = "Contato pelo site: {$data['subject']}";
+        $mail->Subject = "Resposta do formulário de contato Spa Hochheim: {$data['subject']}";
         $mail->isHTML(true);
 
         $phone = !empty($data['phone']) ? $data['phone'] : 'Não informado';
@@ -265,9 +272,14 @@ final class EmailService
         try {
             $mail->send();
             return true;
-        } catch (\PHPMailer\PHPMailer\Exception $e) {
+        } catch (\Throwable $e) {
             AppLogger::error('Falha ao enviar formulário de contato', [
-                'error' => $e->getMessage(),
+                'error'      => $e->getMessage(),
+                'smtp_host'  => env('MAIL_HOST'),
+                'smtp_port'  => env('MAIL_PORT', 587),
+                'smtp_user'  => env('MAIL_USER'),
+                'encryption' => env('MAIL_ENCRYPTION', ''),
+                'mailer_info' => $mail->ErrorInfo,
             ]);
             throw new \RuntimeException('Falha ao enviar e-mail de contato: ' . $e->getMessage(), 0, $e);
         }
@@ -340,6 +352,31 @@ final class EmailService
             "Válido até: " . date('d/m/Y', strtotime($giftCard['valid_until'])),
             '',
             'Serviços incluídos:',
+        ];
+
+        foreach ($items as $item) {
+            $lines[] = "- {$item['service_name']} x{$item['quantity']} ({$item['service_duration']} min)";
+        }
+
+        $lines[] = '';
+        $lines[] = 'Apresente este código ao chegar no spa.';
+        $lines[] = 'Day Spa Hochheim — (47) 3037-1707';
+
+        return implode("\n", $lines);
+    }
+
+    private function buildRecipientPlainText(array $order, array $giftCard, array $items): string
+    {
+        $senderName = $order['sender_name'] ?? 'alguém especial';
+        $lines = [
+            "Parabéns, {$order['customer_name']}!",
+            '',
+            "Você ganhou um Cartão Presente do Day Spa Hochheim de {$senderName}.",
+            '',
+            "Código: {$giftCard['code']}",
+            "Válido até: " . date('d/m/Y', strtotime($giftCard['valid_until'])),
+            '',
+            'Serviços incluídos no seu presente:',
         ];
 
         foreach ($items as $item) {

@@ -427,11 +427,11 @@ function SpaceSection() {
     },
     {
       label: "Espaço\nzen",
-      img: "https://images.unsplash.com/photo-1561485132-59468537c8d8?w=800&q=80",
+      img: "https://images.unsplash.com/photo-1620733723572-11c53f73a416?q=80&w=687&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
     },
     {
       label: "Sala de\nmassagem",
-      img: "https://images.unsplash.com/photo-1571896349842-33c89424de2d?w=800&q=80",
+      img: "https://images.unsplash.com/photo-1519823551278-64ac92734fb1?q=80&w=687&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
     },
     {
       label: "Recepção\nacolhedora",
@@ -618,11 +618,27 @@ function ContactSection() {
     message: "",
   });
   const [sent, setSent] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    setSent(true);
-    setTimeout(() => setSent(false), 3000);
+    setLoading(true);
+    setError(null);
+    try {
+      await api.sendContact({
+        name: form.name,
+        email: form.email,
+        phone: form.phone,
+        message: form.message,
+      });
+      setSent(true);
+      setForm({ name: "", phone: "", email: "", message: "" });
+    } catch (err) {
+      setError(err.message ?? "Não foi possível enviar sua mensagem. Tente novamente.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -741,12 +757,16 @@ function ContactSection() {
                   }
                   required
                 />
+                {error && (
+                  <p className="text-red-600 text-sm font-body">{error}</p>
+                )}
                 <button
                   type="submit"
-                  className="btn-primary w-full flex items-center justify-center gap-2 py-4 shadow-sm"
+                  disabled={loading}
+                  className="btn-primary w-full flex items-center justify-center gap-2 py-4 shadow-sm disabled:opacity-60 disabled:cursor-not-allowed"
                 >
                   <Send size={18} />
-                  Enviar mensagem
+                  {loading ? "Enviando..." : "Enviar mensagem"}
                 </button>
               </form>
             )}

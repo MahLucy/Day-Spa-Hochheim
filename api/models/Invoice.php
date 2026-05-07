@@ -70,7 +70,7 @@ final class Invoice
     public function saveFocusRef(int $id, string $ref): bool
     {
         $stmt = $this->pdo->prepare(
-            'UPDATE invoices SET focusnfe_ref = ?, provider_invoice_id = ? WHERE id = ?'
+            "UPDATE invoices SET focusnfe_ref = ?, provider_invoice_id = ?, provider = 'focusnfe' WHERE id = ?"
         );
         $stmt->execute([$ref, $ref, $id]);
         return $stmt->rowCount() > 0;

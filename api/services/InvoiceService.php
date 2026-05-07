@@ -229,7 +229,6 @@ final class InvoiceService
             'data_competencia'                           => $now->format('Y-m-d'),
             'codigo_municipio_emissora'                  => (int) self::MUNICIPIO_BLUMENAU,
             'cnpj_prestador'                             => preg_replace('/\D/', '', env('FOCUSNFE_CNPJ_PRESTADOR', '')),
-            'inscricao_municipal_prestador'              => env('FOCUSNFE_IM_PRESTADOR', ''),
             'codigo_opcao_simples_nacional'              => (int) env('FOCUSNFE_OPCAO_SIMPLES', 3),
             'regime_tributario_simples_nacional'         => (int) env('FOCUSNFE_REGIME_TRIBUTARIO', 1),
             'regime_especial_tributacao'                 => (int) env('FOCUSNFE_REGIME_ESPECIAL', 0),
