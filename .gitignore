@@ -16,3 +16,8 @@ api/fixperms.php
 api/setup_storage.php
 fix_db.php
 dist/
+.env
+.env.*
+!.env.example
+api/test_*
+deploy_completo*
