@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { ChevronLeft, ChevronRight, AlertCircle } from 'lucide-react'
 import CheckoutStepper from '../components/ui/CheckoutStepper'
 import OrderSummary from '../components/ui/OrderSummary'
@@ -112,6 +112,8 @@ export default function PersonalDataPage() {
     if (!validateEmail(form.recipient_email))             e.recipient_email = 'E-mail do presenteado obrigatório.'
     if (!validatePhone(form.recipient_phone))             e.recipient_phone = 'Telefone do presenteado obrigatório.'
     if (!form.consent1)                                        e.consent1        = 'Aceite obrigatório.'
+    if (!form.consent2)                                        e.consent2        = 'Aceite obrigatório.'
+    if (!form.consent3)                                        e.consent3        = 'Aceite obrigatório.'
     return e
   }
 
@@ -359,20 +361,28 @@ export default function PersonalDataPage() {
                     },
                     {
                       key: 'consent2',
-                      required: false,
+                      required: true,
                       text: 'Autorizo o Day Spa Hochheim a entrar em contato via WhatsApp e e-mail para confirmação e lembretes do agendamento.',
                     },
                     {
                       key: 'consent3',
-                      required: false,
-                      text: 'Confirmo que li a política de gestão de saúde e privacidade.',
+                      required: true,
+                      text: (
+                        <>
+                          Confirmo que li a{' '}
+                          <Link to="/politica-de-privacidade" className="text-spa-dark font-medium underline underline-offset-2 hover:text-spa-light transition-colors" target="_blank" rel="noopener noreferrer">
+                            política de gestão de saúde e privacidade
+                          </Link>
+                          .
+                        </>
+                      ),
                     },
                   ].map(c => (
                     <label key={c.key} className="flex items-start gap-3 cursor-pointer group">
                       <div className={`w-5 h-5 rounded border-2 flex items-center justify-center shrink-0 mt-0.5 transition-all ${
                         form[c.key]
                           ? 'bg-spa-dark border-spa-dark'
-                          : c.key === 'consent1' && errors.consent1
+                          : errors[c.key]
                             ? 'border-red-400'
                             : 'border-gray-300 group-hover:border-spa-light'
                       }`}>
@@ -391,7 +401,17 @@ export default function PersonalDataPage() {
                   ))}
                   {errors.consent1 && (
                     <p className="flex items-center gap-1 text-red-500 text-xs font-body">
-                      <AlertCircle size={12} /> {errors.consent1}
+                      <AlertCircle size={12} /> {errors.consent1} (Uso e consentimento)
+                    </p>
+                  )}
+                  {errors.consent2 && (
+                    <p className="flex items-center gap-1 text-red-500 text-xs font-body">
+                      <AlertCircle size={12} /> {errors.consent2} (Contato)
+                    </p>
+                  )}
+                  {errors.consent3 && (
+                    <p className="flex items-center gap-1 text-red-500 text-xs font-body">
+                      <AlertCircle size={12} /> {errors.consent3} (Saúde e privacidade)
                     </p>
                   )}
                 </div>

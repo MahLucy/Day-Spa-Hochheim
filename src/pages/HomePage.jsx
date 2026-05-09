@@ -18,7 +18,7 @@ function HeroSection() {
       <div className="w-full px-4 sm:px-8 lg:px-20 xl:px-80 relative py-10 md:py-12 lg:py-14">
         <div className="max-w-xl text-spa-dark text-left">
           <p className="text-xs font-body font-medium tracking-widest uppercase mb-4">
-            CLÍNICA HOCHHEIM • SPA
+            DAY SPA • HOCHHEIM
           </p>
 
           <h1 className="font-display text-3xl sm:text-4xl lg:text-6xl font-bold leading-tight mb-6">
@@ -26,8 +26,7 @@ function HeroSection() {
           </h1>
 
           <p className="text-sm md:text-xl font-body leading-relaxed mb-8 max-w-lg">
-            Massagens, terapias e cuidados personalizados para o seu bem-estar e
-            equilíbrio.
+            Massagens, terapias e cuidados personalizados para o seu equilíbrio.
           </p>
 
           <div className="flex flex-wrap gap-3">
@@ -127,7 +126,7 @@ function StatsSection() {
       value: "100%",
       label: (
         <>
-          Bem-estar
+          Equilíbrio
           <br />
           garantido
         </>
@@ -161,12 +160,12 @@ function AboutSection() {
       <div className="w-full px-4 sm:px-8 lg:px-20 xl:px-80 relative">
         <div className="bg-spa-dark rounded-[32px] px-6 py-8 md:px-12 md:py-12 max-w-6xl mx-auto">
           <p className="text-white font-subtitle text-base md:text-2xl leading-relaxed">
-            O SPA da Clínica Hochheim foi pensado para proporcionar momentos de {" "}
+            O Day Spa Hochheim foi pensado para proporcionar momentos de {" "}
             <strong className="font-title">
               relaxamento profundo, alívio de tensões e autocuidado.
             </strong>{" "}
             Com técnicas especializadas e ambiente acolhedor, oferecemos
-            experiências completas para o seu bem-estar.
+            experiências completas.
           </p>
         </div>
       </div>
@@ -390,7 +389,7 @@ function GiftCardSection() {
                 Ofereça uma experiência inesquecível
               </h2>
               <p className="text-sm md:text-2xl text-white/70 font-body font-extralight leading-relaxed mb-10 max-w-md">
-                Nossos Cartões Presente permitem presentear alguém especial com uma vivência de bem-estar completa. Personalize o valor e o momento.
+                Nossos Cartões Presente permitem presentear alguém especial com uma vivência completa. Personalize o valor e o momento.
               </p>
               <Link
                 to="/carrinho"
@@ -404,7 +403,7 @@ function GiftCardSection() {
             <div className="flex justify-center md:justify-end">
                 <img
                   src="/cartao-presente.webp"
-                  alt="Cartão Presente - Clínica Hochheim SPA"
+                  alt="Cartão Presente - Day Spa Hochheim"
                   className="w-full h-full object-cover scale-[1.08]"
                 />
               </div>
@@ -535,20 +534,20 @@ function SpaceSection() {
 
 const defaultTestimonials = [
   {
-    nome: "Nome",
+    nome: "Leandro",
     texto:
-      "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.",
+      "Eu e minha esposa adoramos demais a experiência, as meninas foram muito gentis e profissionais e tivemos um excelente momento de relaxamento. Foi exatamente aquilo que a gente precisava! Nota 10.",
   },
   {
-    nome: "Nome",
+    nome: "Thamires",
     texto:
-      "Lorem dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.",
+      "O local e muito limpo e de uma decoração de extremo bom gosto. Foi uma experiência maravilhosa, pretendo voltar em breve e presentear outras pessoas que amo, com umas sessões de relaxamento como estas que eu fiz! Estão de parabéns pelo atendimento!",
     marginTop: "3rem",
   },
   {
-    nome: "Nome",
+    nome: "Monique",
     texto:
-      "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.",
+      "Amei muito a massagem com a Cris!! QUE MÃOS!! Foi uma experiência incrível! Me senti renovada!! Com certeza voltarei mais vezes!!",
   },
 ];
 

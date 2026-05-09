@@ -58,7 +58,7 @@ export default function Footer() {
           <div className="flex flex-col items-center md:items-center gap-2">
             <p className="text-[0.8rem] md:text-xl font-extralight">Blumenau - SC</p>
             <p className="text-[0.8rem] md:text-xl font-extralight break-words">
-              contato@clinicahochheim.com.br
+              contato@spahochheim.com.br
             </p>
             <p className="text-[0.8rem] md:text-xl font-extralight">(47) 3222-0010</p>
 

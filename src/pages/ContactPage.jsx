@@ -17,7 +17,7 @@ const infos = [
   {
     icon: Mail,
     title: 'E-mail',
-    lines: ['contato@clinicahochheim.com.br'],
+    lines: ['contato@spahochheim.com.br'],
   },
   {
     icon: Clock,
@@ -92,7 +92,7 @@ export default function ContactPage() {
             <div className="w-12 md:w-16 h-[3px] bg-spa-accent rounded-full" />
           </div>
           <p className="text-base sm:text-lg lg:text-xl font-body text-white/80 max-w-2xl font-extralight leading-relaxed">
-            Nossa equipe está à disposição para tirar suas dúvidas, agendar seus horários e ajudar a encontrar a experiência perfeita de bem-estar.
+            Nossa equipe está à disposição para tirar suas dúvidas, agendar seus horários e ajudar a encontrar a experiência perfeita.
           </p>
         </div>
       </section>
@@ -114,7 +114,7 @@ export default function ContactPage() {
                       </div>
                       <p className="text-xs font-body font-medium text-spa-muted uppercase tracking-wider mb-2">{info.title}</p>
                       {info.lines.map((line, i) => (
-                        <p key={i} className={`text-sm font-body ${i === 0 ? 'text-spa-dark font-medium' : 'text-spa-muted'}`}>
+                        <p key={i} className={`text-sm font-body break-all ${i === 0 ? 'text-spa-dark font-medium' : 'text-spa-muted'}`}>
                           {line}
                         </p>
                       ))}

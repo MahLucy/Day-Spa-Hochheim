@@ -172,7 +172,7 @@ export default function GiftCardPage() {
             <div className="flex items-center gap-3 mb-6">
               <img src="/logo.png" alt="Day Spa Hochheim" className="h-10 w-auto object-contain brightness-0 invert" />
               <div>
-                <p className="font-body text-xs text-white/50 uppercase tracking-widest">Clínica Hochheim</p>
+                <p className="font-body text-xs text-white/50 uppercase tracking-widest"> Day Spa Hochheim</p>
                 <p className="font-display text-sm text-white font-semibold">Day Spa</p>
               </div>
             </div>

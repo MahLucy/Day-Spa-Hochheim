@@ -1,7 +1,7 @@
 export default function WhatsAppButton() {
   // Número de telefone de contato da clínica (com 55 para o Brasil)
   const phoneNumber = "5547991151707";
-  const message = encodeURIComponent("Olá! Gostaria de tirar uma dúvida sobre os serviços da Clínica Hochheim SPA.");
+  const message = encodeURIComponent("Olá! Gostaria de tirar uma dúvida sobre os serviços da Day Spa Hochheim.");
   const whatsappUrl = `https://wa.me/${phoneNumber}?text=${message}`;
 
   return (
