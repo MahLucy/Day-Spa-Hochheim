@@ -8,7 +8,7 @@ $logoUrl = $appUrl . '/logo.png';
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Pagamento não aprovado — Clínica Hochheim SPA</title>
+<title>Pagamento não aprovado —  Day Spa Hochheim</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@200;400;500;600;700&display=swap');
   body { margin:0; padding:0; background:#9F9D9D; font-family:'Poppins', Arial, sans-serif; color:#004567; }
@@ -54,11 +54,11 @@ $logoUrl = $appUrl . '/logo.png';
 
     <a href="<?= htmlspecialchars($appUrl, ENT_QUOTES, 'UTF-8') ?>/checkout?order=<?= $order['id'] ?>" class="cta">Tentar Novamente</a>
 
-    <p style="font-size:13px;color:#1B7C9F;font-weight:600;">Dúvidas? Fale conosco pelo (47) 3037-1707 ou WhatsApp.</p>
+    <p style="font-size:13px;color:#1B7C9F;font-weight:600;">Dúvidas? Fale conosco pelo (47) 3037-1707 ou pelo WhatsApp <a href="https://wa.me/5547991151707">(47) 99115-1707</a>.</p>
   </div>
 
   <div class="footer">
-    <p>Clínica Hochheim SPA — Blumenau – SC</p>
+    <p>Day Spa Hochheim — Blumenau – SC</p>
     <p>(47) 3037-1707 &bull; Seg–Sex: 13h às 21h</p>
   </div>
 </div>

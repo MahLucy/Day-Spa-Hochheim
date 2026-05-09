@@ -29,7 +29,7 @@ $senderName    = htmlspecialchars($order['sender_name'] ?? 'alguém especial', E
   .hero img { max-width:130px; margin-bottom:20px; opacity:.9; }
 
   /* Cartão com código */
-  .gift-card { margin:0 24px; background:#1B7C9F; border-radius:12px; padding:28px; text-align:center; margin-top:-20px; position:relative; box-shadow:0 8px 32px rgba(0,0,0,.18); }
+  .gift-card { background:rgba(255,255,255,.12); border:2px solid rgba(255,255,255,.25); border-radius:12px; padding:28px; text-align:center; margin-top:28px; box-shadow:0 8px 32px rgba(0,0,0,.2); }
   .gift-card .code { font-size:28px; font-weight:700; color:#FDFEFF; letter-spacing:6px; font-family:monospace; margin:0 0 8px; }
   .gift-card .validity { font-size:12px; color:#FDFEFF; opacity:.8; margin:0; letter-spacing:1px; }
 
@@ -72,18 +72,17 @@ $senderName    = htmlspecialchars($order['sender_name'] ?? 'alguém especial', E
     <div class="congrats">🎁</div>
     <h1>Parabéns, <?= $recipientName ?>!</h1>
     <p class="subtitle">Você ganhou um Cartão Presente do Day Spa Hochheim</p>
-  </div>
-
-  <div class="gift-card">
-    <p class="code"><?= htmlspecialchars($giftCard['code'], ENT_QUOTES, 'UTF-8') ?></p>
-    <p class="validity">Válido até <?= $validUntil ?></p>
+    <div class="gift-card">
+      <p class="code"><?= htmlspecialchars($giftCard['code'], ENT_QUOTES, 'UTF-8') ?></p>
+      <p class="validity">Válido até <?= $validUntil ?></p>
+    </div>
   </div>
 
   <div class="body">
     <h2>Uma experiência única te espera!</h2>
     <p>
-      Você foi presenteado(a) com um cartão de bem-estar no <strong>Day Spa Hochheim</strong>.
-      Apresente o código ou o QR Code ao chegar à clínica para aproveitar todos os serviços incluídos.
+      Você foi presenteado(a) com um cartão no <strong>Day Spa Hochheim</strong>.
+      Apresente o código ou o QR Code ao chegar à Day Spa Hochheim para aproveitar todos os serviços incluídos.
     </p>
 
     <div class="sender-box">

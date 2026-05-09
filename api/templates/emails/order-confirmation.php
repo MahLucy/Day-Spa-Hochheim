@@ -79,9 +79,9 @@ $logoUrl = $appUrl . '/logo.png';
   </div>
 
   <div class="footer">
-    <p>Clínica Hochheim SPA — Blumenau – SC</p>
+    <p>Day Spa Hochheim — Blumenau – SC</p>
     <p>(47) 3037-1707 &bull; contato@hochheim.com.br</p>
-    <p style="margin-top:12px;color:#92DEFD;">Seu momento de cuidado e bem-estar.</p>
+    <p style="margin-top:12px;color:#92DEFD;">Seu momento de cuidado.</p>
   </div>
 </div>
 </body>

@@ -11,7 +11,7 @@ $validUntil = date('d/m/Y', strtotime($giftCard['valid_until']));
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Cartão Presente Impresso — Clínica Hochheim SPA</title>
+<title>Cartão Presente Impresso —  Day Spa Hochheim</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@200;400;500;600;700&display=swap');
   body { margin:0; padding:0; background:#9F9D9D; font-family:'Poppins', Arial, sans-serif; color:#004567; }
@@ -48,7 +48,7 @@ $validUntil = date('d/m/Y', strtotime($giftCard['valid_until']));
 
   <div class="body">
     <h2>Olá, <?= htmlspecialchars($order['customer_name'], ENT_QUOTES, 'UTF-8') ?>!</h2>
-    <p>Seu pedido de <strong>cartão presente impresso</strong> foi confirmado. Veja as informações abaixo e acompanhe os próximos passos para a retirada na clínica.</p>
+    <p>Seu pedido de <strong>cartão presente impresso</strong> foi confirmado. Veja as informações abaixo e acompanhe os próximos passos para a retirada na Day Spa Hochheim.</p>
 
     <div class="info-box">
       <p><strong>Pedido:</strong> #<?= $order['id'] ?></p>
@@ -71,11 +71,11 @@ $validUntil = date('d/m/Y', strtotime($giftCard['valid_until']));
     <h3 style="font-size:16px;font-weight:600;margin:32px 0 16px;color:#004567;">Próximos passos</h3>
     <div class="step">
       <div class="step-num">1</div>
-      <div class="step-text">Entre em contato pelo <strong>(47) 3037-1707</strong> ou WhatsApp para confirmar o horário de retirada do seu cartão impresso.</div>
+      <div class="step-text">Entre em contato pelo <strong>(47) 3037-1707</strong> ou WhatsApp <a href="https://wa.me/5547991151707">(47) 99115-1707</a> para confirmar o horário de retirada do seu cartão impresso.</div>
     </div>
     <div class="step">
       <div class="step-num">2</div>
-      <div class="step-text">Passe na nossa clínica para retirar a embalagem premium com o cartão físico. Leve um documento de identificação com foto.</div>
+      <div class="step-text">Passe no Day Spa Hochheim para retirar o seu cartão físico. Leve um documento de identificação com foto e o código do cartão.</div>
     </div>
     <div class="step">
       <div class="step-num">3</div>
@@ -84,7 +84,7 @@ $validUntil = date('d/m/Y', strtotime($giftCard['valid_until']));
   </div>
 
   <div class="footer">
-    <p>Clínica Hochheim SPA — Blumenau – SC</p>
+    <p>Day Spa Hochheim — Blumenau – SC</p>
     <p>(47) 3037-1707 &bull; Seg–Sex: 13h às 21h</p>
   </div>
 </div>

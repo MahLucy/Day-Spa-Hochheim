@@ -156,25 +156,51 @@ final class GiftCardService
             }
         }
 
+        // Carrega logo como base64
+        $logoBase64 = '';
+        $logoPath   = env('LOGO_PATH', dirname(dirname(__DIR__)) . '/public/logo.png');
+        if (file_exists($logoPath)) {
+            $logoBase64 = 'data:image/png;base64,' . base64_encode(file_get_contents($logoPath));
+        }
+
+        // Resolve o caminho da imagem de fundo (sem base64 para evitar estouro de memória no Dompdf)
+        // Candidatos em ordem: env var → raiz do deploy (cPanel) → pasta public/ (dev local)
+        $bgFilePath = '';
+        foreach ([
+            env('GIFTCARD_BG_PATH', ''),
+            dirname(dirname(__DIR__)) . '/cartao-presente-bg.png',
+            dirname(dirname(__DIR__)) . '/public/cartao-presente-bg.png',
+            dirname(dirname(__DIR__)) . '/public/cartao-presente-bg.jpg',
+        ] as $candidate) {
+            if ($candidate !== '' && file_exists($candidate)) {
+                $bgFilePath = $candidate;
+                break;
+            }
+        }
+        // Converte para URI file:// que o Dompdf lê diretamente (sem base64 em memória)
+        $bgSrc = $bgFilePath !== '' ? 'file://' . $bgFilePath : '';
+
         // Renderiza template HTML
         ob_start();
         $templateData = compact(
-            'code', 'order', 'items', 'giftCardItems', 'validUntil', 'qrCodeBase64'
+            'code', 'order', 'items', 'giftCardItems', 'validUntil', 'qrCodeBase64', 'logoBase64', 'bgSrc'
         );
         extract($templateData);
         require dirname(__DIR__) . '/templates/pdf/giftcard.php';
         $html = ob_get_clean();
 
         // Gera PDF com Dompdf
+        $projectRoot = dirname(dirname(__DIR__));
         $options = new Options();
         $options->set('isHtml5ParserEnabled', true);
         $options->set('isRemoteEnabled', false);
         $options->set('defaultFont', 'Helvetica');
-        $options->set('chroot', $this->getStoragePath());
+        // Permite Dompdf acessar arquivos do projeto (imagem de fundo) e do storage (QR)
+        $options->set('chroot', [$projectRoot, $this->getStoragePath()]);
 
         $dompdf = new Dompdf($options);
         $dompdf->loadHtml($html, 'UTF-8');
-        $dompdf->setPaper('A5', 'portrait');
+        $dompdf->setPaper('A5', 'landscape');
         $dompdf->render();
 
         $storageDir = $this->getStorageDir('pdfs');

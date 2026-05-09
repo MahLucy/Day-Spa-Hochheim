@@ -13,7 +13,7 @@ $validUntil  = date('d/m/Y', strtotime($giftCard['valid_until']));
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Seu Cartão Presente — Clínica Hochheim SPA</title>
+<title>Seu Cartão Presente — Day Spa Hochheim</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@200;400;500;600;700&display=swap');
   body { margin:0; padding:0; background:#9F9D9D; font-family:'Poppins', Arial, sans-serif; color:#004567; }
@@ -22,7 +22,7 @@ $validUntil  = date('d/m/Y', strtotime($giftCard['valid_until']));
   .header img { max-width:160px; margin-bottom:12px; }
   .header h1 { color:#FDFEFF; margin:0 0 4px; font-size:24px; font-weight:500; letter-spacing:2px; text-transform:uppercase; }
   .header p  { color:#92DEFD; margin:0; font-size:12px; letter-spacing:1px; font-weight:200; }
-  .gift-card { margin:0 24px; background:#1B7C9F; border-radius:12px; padding:28px; text-align:center; margin-top:-20px; position:relative; box-shadow:0 8px 32px rgba(0,0,0,.15); }
+  .gift-card { background:rgba(255,255,255,.12); border:2px solid rgba(255,255,255,.25); border-radius:12px; padding:28px; text-align:center; margin-top:28px; box-shadow:0 8px 32px rgba(0,0,0,.2); }
   .gift-card .code { font-size:28px; font-weight:700; color:#FDFEFF; letter-spacing:6px; font-family:monospace; margin:0 0 8px; }
   .gift-card .validity { font-size:12px; color:#FDFEFF; opacity:0.8; margin:0; letter-spacing:1px; }
   .body { padding:32px 40px; }
@@ -47,17 +47,16 @@ $validUntil  = date('d/m/Y', strtotime($giftCard['valid_until']));
   <div class="header">
     <img src="<?= htmlspecialchars($logoUrl, ENT_QUOTES, 'UTF-8') ?>" alt="Clínica Hochheim">
     <h1>Day Spa Hochheim</h1>
-    <p>Seu presente de bem-estar chegou!</p>
-  </div>
-
-  <div class="gift-card">
-    <p class="code"><?= htmlspecialchars($giftCard['code'], ENT_QUOTES, 'UTF-8') ?></p>
-    <p class="validity">Válido até <?= $validUntil ?></p>
+    <p>Seu presente chegou!</p>
+    <div class="gift-card">
+      <p class="code"><?= htmlspecialchars($giftCard['code'], ENT_QUOTES, 'UTF-8') ?></p>
+      <p class="validity">Válido até <?= $validUntil ?></p>
+    </div>
   </div>
 
   <div class="body">
     <h2>Olá, <?= htmlspecialchars($order['customer_name'], ENT_QUOTES, 'UTF-8') ?>!</h2>
-    <p>Seu cartão presente da <strong>Clínica Hochheim SPA</strong> está pronto. Apresente o código ou o QR Code ao chegar à clínica.</p>
+    <p>Seu cartão presente da <strong>Day Spa Hochheim</strong> está pronto. Apresente o código ou o QR Code ao chegar à Day Spa Hochheim.</p>
 
     <div class="services">
       <h3>Serviços incluídos</h3>
@@ -85,7 +84,7 @@ $validUntil  = date('d/m/Y', strtotime($giftCard['valid_until']));
   </div>
 
   <div class="footer">
-    <p>Clínica Hochheim SPA — Blumenau – SC</p>
+    <p>Day Spa Hochheim — Blumenau – SC</p>
     <p>(47) 3037-1707 &bull; Seg–Sex: 13h às 21h</p>
   </div>
 </div>
