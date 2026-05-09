@@ -199,7 +199,11 @@ export const adminApi = {
       method: 'POST',
       headers: { Authorization: creds.Authorization },
       body: formData,
-    }).then(r => r.json())
+    }).then(async r => {
+      const data = await r.json()
+      if (!r.ok) throw new ApiError(data.message || 'Erro no upload da imagem.', r.status, data.errors)
+      return data
+    })
   },
 
   // ── Pedidos ───────────────────────────────────────────────────────────────
@@ -237,6 +241,10 @@ export const adminApi = {
 
   reissueInvoice(id) {
     return request('POST', `/admin/invoices/${id}/reissue`, null, adminCredentials())
+  },
+
+  consultInvoiceStatus(id) {
+    return request('GET', `/admin/invoices/${id}/status`, null, adminCredentials())
   },
 
   // ── Relatórios ────────────────────────────────────────────────────────────

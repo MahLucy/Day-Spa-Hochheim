@@ -52,7 +52,7 @@ final class AdminController
     {
         $months = min(24, max(1, (int) ($_GET['months'] ?? 12)));
         $data   = $this->orderModel->revenueByMonth($months);
-        Response::success($data);
+        Response::success(['revenue' => $data]);
     }
 
     /**
@@ -65,6 +65,6 @@ final class AdminController
     {
         $limit = min(50, max(5, (int) ($_GET['limit'] ?? 10)));
         $data  = $this->serviceModel->topSelling($limit);
-        Response::success($data);
+        Response::success(['services' => $data]);
     }
 }

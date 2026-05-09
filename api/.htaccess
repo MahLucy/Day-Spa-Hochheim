@@ -11,7 +11,10 @@ Options -MultiViews
 <IfModule mod_rewrite.c>
     RewriteEngine On
     RewriteBase /api/
-    
+
+    # Passa Authorization header para PHP no cPanel (FastCGI/CGI não repassa por padrão)
+    RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
+
     # Bloqueia acesso direto às pastas internas (com barra — nunca deve chegar aqui)
     RewriteRule ^(config|models|middleware|helpers|migrations|storage/logs)/ - [F,L]
 

@@ -13,7 +13,7 @@ export default function AdminServices() {
   const [saving, setSaving]     = useState(false)
   const [form, setForm]         = useState(emptyForm)
   const [formErrors, setFormErrors] = useState({})
-  const [toast, setToast]       = useState('')
+  const [toast, setToast]       = useState(null)
 
   const load = async () => {
     setLoading(true)
@@ -29,9 +29,9 @@ export default function AdminServices() {
 
   useEffect(() => { load() }, [])
 
-  const showToast = (msg) => {
-    setToast(msg)
-    setTimeout(() => setToast(''), 3000)
+  const showToast = (msg, type = 'success') => {
+    setToast({ msg, type })
+    setTimeout(() => setToast(null), 3000)
   }
 
   const openCreate = () => {
@@ -104,7 +104,7 @@ export default function AdminServices() {
       showToast(service.active ? 'Serviço desativado.' : 'Serviço ativado.')
       await load()
     } catch (err) {
-      showToast('Erro: ' + err.message)
+      showToast('Erro: ' + err.message, 'error')
     }
   }
 
@@ -115,7 +115,7 @@ export default function AdminServices() {
       showToast('Serviço desativado.')
       await load()
     } catch (err) {
-      showToast('Erro: ' + err.message)
+      showToast('Erro: ' + err.message, 'error')
     }
   }
 
@@ -123,14 +123,14 @@ export default function AdminServices() {
     const file = event.target.files?.[0]
     if (!file) return
     
-    showToast('Enviando imagem...')
+    showToast('Enviando imagem...', 'info')
     
     try {
       await adminApi.uploadServiceImage(id, file)
-      showToast('Imagem atualizada com sucesso.')
+      showToast('Imagem atualizada com sucesso.', 'success')
       await load()
     } catch (err) {
-      showToast('Erro ao enviar imagem: ' + err.message)
+      showToast('Erro ao enviar imagem: ' + err.message, 'error')
     } finally {
       event.target.value = ''
     }
@@ -140,8 +140,14 @@ export default function AdminServices() {
     <div>
       {/* Toast */}
       {toast && (
-        <div className="fixed top-6 right-6 z-50 flex items-center gap-2 bg-spa-dark text-white text-sm font-body px-4 py-3 rounded-xl shadow-lg">
-          <Check size={14} /> {toast}
+        <div className={`fixed top-6 right-6 z-50 flex items-center gap-2 text-white text-sm font-body px-4 py-3 rounded-xl shadow-lg transition-all ${
+          toast.type === 'error' ? 'bg-red-500' :
+          toast.type === 'info' ? 'bg-blue-500' : 'bg-spa-dark'
+        }`}>
+          {toast.type === 'error' ? <AlertCircle size={14} /> :
+           toast.type === 'info' ? <Loader2 size={14} className="animate-spin" /> :
+           <Check size={14} />}
+          {toast.msg}
         </div>
       )}
 

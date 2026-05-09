@@ -8,6 +8,28 @@ ini_set('display_errors', '0');
 ini_set('display_startup_errors', '0');
 error_reporting(E_ALL);   // captura tudo no log, mas não exibe
 
+// ─── Captura erros fatais (E_ERROR) que escapam do set_exception_handler ──────
+register_shutdown_function(function (): void {
+    $err = error_get_last();
+    if ($err && in_array($err['type'], [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR], true)) {
+        if (class_exists('AppLogger')) {
+            AppLogger::error('Fatal error', ['message' => $err['message'], 'file' => $err['file'], 'line' => $err['line']]);
+        }
+        if (http_response_code() === 200) {
+            http_response_code(500);
+        }
+        if (ob_get_length() === 0) {
+            echo json_encode([
+                'success' => false,
+                'message' => 'Erro interno do servidor.',
+                'debug'   => (defined('ENV_LOADED') && function_exists('env') && env('APP_ENV') !== 'production')
+                    ? $err['message'] . ' in ' . $err['file'] . ':' . $err['line']
+                    : null,
+            ]);
+        }
+    }
+});
+
 // ─── Autoloader do Composer ───────────────────────────────────────────────────
 require_once __DIR__ . '/vendor/autoload.php';
 

@@ -153,6 +153,10 @@ function dispatchAdminRoute(string $method, string $uri): void
         (new \App\Controllers\InvoiceController())->adminIndex();
     }
 
+    // if ($method === 'DELETE' && preg_match('#^/invoices/(\d+)$#', $adminUri, $m)) {
+    //     (new \App\Controllers\InvoiceController())->cancel((int) $m[1]);
+    // }
+
     if ($method === 'POST' && preg_match('#^/invoices/(\d+)/reissue$#', $adminUri, $m)) {
         (new \App\Controllers\InvoiceController())->reissue((int) $m[1]);
     }

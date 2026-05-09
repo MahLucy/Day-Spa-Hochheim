@@ -115,7 +115,8 @@ final class Service
     {
         $stmt = $this->pdo->prepare(
             'SELECT s.id, s.name, s.category, s.price,
-                    COALESCE(SUM(oi.quantity), 0) AS total_sold
+                    COALESCE(SUM(oi.quantity), 0) AS total_sold,
+                    COALESCE(SUM(oi.subtotal), 0) AS revenue
              FROM services s
              LEFT JOIN order_items oi ON oi.service_id = s.id
              LEFT JOIN orders o ON o.id = oi.order_id AND o.status IN (\'paid\', \'completed\')
