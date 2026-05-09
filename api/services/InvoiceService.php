@@ -162,6 +162,49 @@ final class InvoiceService
     }
 
     /**
+     * Cancela uma NFS-e autorizada na Focus NFe.
+     * Apenas notas com status 'issued' (autorizado) podem ser canceladas.
+     * O cancelamento é definitivo e não pode ser desfeito.
+     */
+    public function cancel(int $invoiceId, string $justificativa): array
+    {
+        $invoice = $this->invoiceModel->findById($invoiceId);
+        if (!$invoice) {
+            throw new \RuntimeException("Invoice #$invoiceId não encontrada.");
+        }
+        if ($invoice['status'] !== 'issued') {
+            throw new \RuntimeException("Apenas notas autorizadas podem ser canceladas (status atual: {$invoice['status']}).");
+        }
+        if (empty($invoice['focusnfe_ref'])) {
+            throw new \RuntimeException("Referência Focus NFe ausente — nota não pode ser cancelada via API.");
+        }
+        if (strlen($justificativa) < 15 || strlen($justificativa) > 255) {
+            throw new \InvalidArgumentException("Justificativa deve ter entre 15 e 255 caracteres.");
+        }
+
+        $token = env('FOCUSNFE_TOKEN', '');
+        if (empty($token)) {
+            throw new \RuntimeException('FOCUSNFE_TOKEN não configurado.');
+        }
+
+        $ref      = $invoice['focusnfe_ref'];
+        $response = $this->apiRequest('DELETE', self::ENDPOINT . '/' . urlencode($ref), ['justificativa' => $justificativa], $token);
+
+        $status = $response['status'] ?? '';
+
+        if ($status === 'cancelado') {
+            $this->invoiceModel->markCancelled($invoiceId);
+            AppLogger::info('NFS-e cancelada', ['invoice_id' => $invoiceId, 'ref' => $ref]);
+        } elseif ($status === 'erro_cancelamento') {
+            $erros = $response['erros'] ?? [];
+            $msg   = implode('; ', array_column($erros, 'mensagem'));
+            throw new \RuntimeException("Erro ao cancelar NFS-e: $msg");
+        }
+
+        return $response;
+    }
+
+    /**
      * Reemite nota fiscal (ação admin).
      */
     public function reissue(int $orderId): ?array
@@ -245,6 +288,11 @@ final class InvoiceService
             'percentual_total_tributos_simples_nacional' => env('FOCUSNFE_TOTAL_TRIBUTOS', '17.52'),
         ];
 
+        $im = env('FOCUSNFE_IM_PRESTADOR', '');
+        if ($im !== '') {
+            $payload['inscricao_municipal_prestador'] = $im;
+        }
+
         if (strlen($cpf) === 11) {
             $payload['cpf_tomador'] = $cpf;
         } elseif (strlen($cpf) === 14) {
@@ -261,7 +309,7 @@ final class InvoiceService
     private function buildDescricao(array $items, array $order): string
     {
         if (empty($items)) {
-            return 'Cartão Presente — Serviços de Spa e Bem-Estar';
+            return 'Cartão Presente — Day Spa Hochheim';
         }
 
         $parts = [];

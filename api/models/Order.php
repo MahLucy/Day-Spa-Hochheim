@@ -194,7 +194,7 @@ final class Order
     {
         $stmt = $this->pdo->prepare(
             "SELECT DATE_FORMAT(created_at, '%Y-%m') AS month,
-                    COALESCE(SUM(total), 0)           AS revenue,
+                    COALESCE(SUM(total), 0)           AS total,
                     COUNT(*)                          AS orders
              FROM orders
              WHERE status IN ('paid', 'completed')

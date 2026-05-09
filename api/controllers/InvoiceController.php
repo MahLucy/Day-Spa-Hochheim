@@ -43,6 +43,7 @@ final class InvoiceController
             $invoice['xml_url'] = $invoice['xml_path']
                 ? rtrim(env('STORAGE_URL', ''), '/') . '/' . $invoice['xml_path']
                 : null;
+            // url_danfse já vem direto do banco (URL do S3 da Focus NFe)
         }
 
         Response::success(['invoices' => $invoices]);
@@ -72,6 +73,41 @@ final class InvoiceController
             Response::serverError('Falha ao consultar status: ' . $e->getMessage());
         }
     }
+
+    // /** DELETE /api/admin/invoices/:id — Cancela NFS-e na Focus NFe */
+    // public function cancel(int $id): never
+    // {
+    //     $invoice = $this->invoiceModel->findById($id);
+    //     if (!$invoice) {
+    //         Response::notFound('Nota fiscal não encontrada.');
+    //     }
+
+    //     $body          = Validator::getJsonBody();
+    //     $justificativa = trim($body['justificativa'] ?? '');
+
+    //     if (strlen($justificativa) < 15) {
+    //         Response::error('Informe uma justificativa com pelo menos 15 caracteres.', 422);
+    //     }
+
+    //     try {
+    //         $result = $this->invoiceService->cancel($id, $justificativa);
+
+    //         AppLogger::adminAction('cancel_invoice', 'invoice', $id, [
+    //             'order_id'      => $invoice['order_id'],
+    //             'justificativa' => $justificativa,
+    //         ]);
+
+    //         Response::success($result, 'Nota fiscal cancelada com sucesso.');
+    //     } catch (\InvalidArgumentException $e) {
+    //         Response::error($e->getMessage(), 422);
+    //     } catch (\Throwable $e) {
+    //         AppLogger::error('Erro ao cancelar nota fiscal', [
+    //             'invoice_id' => $id,
+    //             'error'      => $e->getMessage(),
+    //         ]);
+    //         Response::serverError('Falha ao cancelar nota fiscal: ' . $e->getMessage());
+    //     }
+    // }
 
     /** POST /api/admin/invoices/:id/reissue */
     public function reissue(int $id): never

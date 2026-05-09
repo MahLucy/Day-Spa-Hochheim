@@ -18,7 +18,8 @@ export default function AdminInvoices() {
   const [loading, setLoading]  = useState(true)
   const [error, setError]      = useState('')
   const [toast, setToast]      = useState('')
-  const [reissuing, setReissuing] = useState(null)
+  const [reissuing, setReissuing]   = useState(null)
+  const [consulting, setConsulting] = useState(null)
   const [filters, setFilters]  = useState({ status: '' })
 
   const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(''), 3000) }
@@ -38,6 +39,19 @@ export default function AdminInvoices() {
   }
 
   useEffect(() => { load() }, [])
+
+  const handleConsultStatus = async (invoice) => {
+    setConsulting(invoice.id)
+    try {
+      const res = await adminApi.consultInvoiceStatus(invoice.id)
+      showToast(`Status: ${res.data?.status ?? 'consultado'}`)
+      await load()
+    } catch (err) {
+      showToast('Erro: ' + err.message)
+    } finally {
+      setConsulting(null)
+    }
+  }
 
   const handleReissue = async (invoice) => {
     if (!confirm(`Reemitir nota fiscal do pedido #${invoice.order_id}?`)) return
@@ -129,12 +143,19 @@ export default function AdminInvoices() {
                       </td>
                       <td className="px-5 py-4 text-xs font-body text-spa-muted">{fmtDate(inv.issued_at)}</td>
                       <td className="px-5 py-4">
-                        <div className="flex items-center gap-2">
-                          {inv.pdf_url && (
-                            <a href={inv.pdf_url} target="_blank" rel="noopener noreferrer"
+                        <div className="flex items-center gap-2 flex-wrap">
+                          {(inv.url_danfse || inv.pdf_url) && (
+                            <a href={inv.url_danfse ?? inv.pdf_url} target="_blank" rel="noopener noreferrer"
                               className="flex items-center gap-1 text-xs font-body text-spa-muted hover:text-spa-dark px-2 py-1 rounded-lg hover:bg-gray-100 transition-all">
-                              <Download size={12} /> PDF
+                              <Download size={12} /> DANFSe
                             </a>
+                          )}
+                          {inv.status === 'pending' && inv.focusnfe_ref && (
+                            <button onClick={() => handleConsultStatus(inv)} disabled={consulting === inv.id}
+                              className="flex items-center gap-1 text-xs font-body text-blue-600 hover:text-blue-800 px-2 py-1 rounded-lg hover:bg-blue-50 transition-all disabled:opacity-50">
+                              {consulting === inv.id ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
+                              Consultar
+                            </button>
                           )}
                           {(inv.status === 'error' || inv.status === 'pending') && (
                             <button onClick={() => handleReissue(inv)} disabled={reissuing === inv.id}
