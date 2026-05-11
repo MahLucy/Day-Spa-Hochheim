@@ -143,6 +143,7 @@ export default function PaymentPage() {
             ticket:          'all', // boleto
             bankTransfer:    'all', // PIX
             maxInstallments: 3,
+            minInstallments: 1,
           },
         },
         callbacks: {
@@ -185,10 +186,28 @@ export default function PaymentPage() {
                 return
               }
 
+              // Resolve o tipo de pagamento: prioriza additionalData do Brick,
+              // depois formData.payment_type, e por último deriva do method_id.
+              // O fallback precisa cobrir IDs de boleto que não começam com "boleto"
+              // (ex: bolbradesco, bolsantander) — o Brick nem sempre preenche
+              // additionalData.paymentTypeId nesses casos.
+              const BOLETO_IDS = ['bolbradesco', 'bolsantander', 'boletobbrasil', 'pec']
+              const methodId = formData?.payment_method_id ?? ''
+              const resolvedPaymentType =
+                additionalData?.paymentTypeId ||
+                formData?.payment_type ||
+                (methodId === 'pix'
+                  ? 'bank_transfer'
+                  : BOLETO_IDS.includes(methodId) || methodId.startsWith('boleto')
+                    ? 'ticket'
+                    : methodId.startsWith('deb')
+                      ? 'debit_card'
+                      : 'credit_card')
+
               const payload = {
                 order_id: storedOrderId,
                 ...formData,
-                payment_type: additionalData?.paymentTypeId || formData.payment_type || 'credit_card',
+                payment_type: resolvedPaymentType,
               }
               console.log('[Payment] Enviando para /payments/process:', {
                 order_id:          payload.order_id,

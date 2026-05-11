@@ -56,7 +56,7 @@ final class PaymentService
         $paymentMethodId   = $formData['payment_method_id'] ?? '';
         $paymentMethodType = $this->resolvePaymentMethodType($paymentMethodId, $formData);
         $token             = $formData['token'] ?? null;
-        $installments      = isset($formData['installments']) ? (int) $formData['installments'] : 1;
+        $installments      = min(3, max(1, isset($formData['installments']) ? (int) $formData['installments'] : 1));
 
         AppLogger::info('processPayment — dados recebidos do frontend', [
             'order_id'            => $orderId,
@@ -118,11 +118,22 @@ final class PaymentService
             $orderPayload['payer']['identification'] = $formData['payer']['identification'];
         }
 
-        // Para boleto, adicionar endereço do pagador se disponível
+        // Para boleto, adicionar nome completo do pagador (exigido pela Orders API)
         if ($paymentMethodType === 'ticket') {
             $nameParts = explode(' ', trim($order['customer_name'] ?? ''), 2);
             $orderPayload['payer']['first_name'] = $nameParts[0] ?? '';
             $orderPayload['payer']['last_name']  = $nameParts[1] ?? '';
+        }
+
+        // Para cartão de crédito/débito, habilitar 3DS automático.
+        // O padrão da conta estava em "never", causando rejeições por high_risk.
+        // "auto" deixa o MP acionar 3DS quando o motor de risco julgar necessário.
+        if (in_array($paymentMethodType, ['credit_card', 'debit_card'], true)) {
+            $orderPayload['config'] = [
+                'online' => [
+                    'transaction_security' => ['validation' => 'auto'],
+                ],
+            ];
         }
 
         try {
@@ -544,6 +555,16 @@ final class PaymentService
         $payment   = $this->paymentModel->findByOrderId($orderId);
         $paymentId = $payment ? (int) $payment['id'] : 0;
 
+        // Idempotência por order_id — mais confiável que findByProviderPaymentId(),
+        // pois a Orders API usa IDs no formato "PAY01KR…" (string) enquanto o webhook
+        // de "payment" entrega IDs numéricos (ex: 157661666623), causando mismatch.
+        if ($payment && $payment['status'] === 'approved') {
+            AppLogger::info('Webhook payment: pagamento já aprovado — ignorado (idempotência)', [
+                'order_id' => $orderId,
+            ]);
+            return ['processed' => true, 'order_id' => $orderId];
+        }
+
         if ($mpStatus === 'approved') {
             if (!$paymentId) {
                 $paymentId = $this->paymentModel->create($orderId, [
@@ -565,6 +586,22 @@ final class PaymentService
 
     private function triggerPostPaymentFlow(int $orderId): void
     {
+        // Idempotência atômica: garante que apenas UM processo execute este fluxo,
+        // mesmo quando múltiplos webhooks (payment + order) chegam simultaneamente.
+        // O UPDATE só afeta 1 linha se o status atual for 'paid'; qualquer outro processo
+        // concorrente receberá rowCount=0 e encerra sem duplicar gift card, e-mail ou NFS-e.
+        $stmt = $this->pdo->prepare(
+            "UPDATE orders SET status = 'processing' WHERE id = ? AND status = 'paid'"
+        );
+        $stmt->execute([$orderId]);
+
+        if ($stmt->rowCount() === 0) {
+            AppLogger::info('triggerPostPaymentFlow ignorado — pedido já em processamento ou concluído', [
+                'order_id' => $orderId,
+            ]);
+            return;
+        }
+
         try {
             $giftCardService = new GiftCardService($this->pdo);
             $giftCardService->generate($orderId);
@@ -577,6 +614,7 @@ final class PaymentService
             if ($order) {
                 $emailService = new EmailService();
                 $emailService->sendGiftCard($orderId);
+                AppLogger::info('E-mail de gift card enviado', ['order_id' => $orderId]);
             }
         } catch (\Throwable $e) {
             AppLogger::error('Erro ao enviar e-mail do gift card', ['order_id' => $orderId, 'error' => $e->getMessage()]);
@@ -619,7 +657,13 @@ final class PaymentService
     private function resolvePaymentMethodType(string $methodId, array $formData): string
     {
         if ($methodId === 'pix') return 'bank_transfer';
-        if (str_starts_with($methodId, 'boleto') || $methodId === 'pec') return 'ticket';
+
+        // IDs de boleto bancário no Brasil — "boleto" como prefixo NÃO abrange todos
+        // (ex: bolbradesco, bolsantander não começam com "boleto")
+        $boletoIds = ['bolbradesco', 'bolsantander', 'boletobbrasil', 'pec'];
+        if (str_starts_with($methodId, 'boleto') || in_array($methodId, $boletoIds, true)) {
+            return 'ticket';
+        }
 
         // Payment Brick envia paymentTypeId via additionalData no frontend
         $type = $formData['payment_type'] ?? $formData['paymentType'] ?? '';
