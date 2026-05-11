@@ -15,9 +15,6 @@ Options -MultiViews
     # Passa Authorization header para PHP no cPanel (FastCGI/CGI não repassa por padrão)
     RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
 
-    # Bloqueia acesso direto às pastas internas (com barra — nunca deve chegar aqui)
-    RewriteRule ^(config|models|middleware|helpers|migrations|storage/logs)/ - [F,L]
-
     # Permite acesso a storage (PDFs, QR Codes)
     RewriteCond %{REQUEST_URI} ^/api/storage/ [OR]
     RewriteCond %{REQUEST_URI} ^/storage/
