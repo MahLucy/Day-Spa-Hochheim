@@ -187,21 +187,62 @@ final class InvoiceService
             throw new \RuntimeException('FOCUSNFE_TOKEN não configurado.');
         }
 
-        $ref      = $invoice['focusnfe_ref'];
-        $response = $this->apiRequest('DELETE', self::ENDPOINT . '/' . urlencode($ref), ['justificativa' => $justificativa], $token);
+        $ref        = $invoice['focusnfe_ref'];
+        $maxRetries = 3;
+        $delays     = [0, 5, 15]; // segundos antes de cada tentativa
+        $lastError  = null;
 
-        $status = $response['status'] ?? '';
+        for ($attempt = 0; $attempt < $maxRetries; $attempt++) {
+            if ($delays[$attempt] > 0) {
+                sleep($delays[$attempt]);
+            }
 
-        if ($status === 'cancelado') {
-            $this->invoiceModel->markCancelled($invoiceId);
-            AppLogger::info('NFS-e cancelada', ['invoice_id' => $invoiceId, 'ref' => $ref]);
-        } elseif ($status === 'erro_cancelamento') {
-            $erros = $response['erros'] ?? [];
-            $msg   = implode('; ', array_column($erros, 'mensagem'));
-            throw new \RuntimeException("Erro ao cancelar NFS-e: $msg");
+            try {
+                $response = $this->apiRequest('DELETE', self::ENDPOINT . '/' . urlencode($ref), ['justificativa' => $justificativa], $token);
+            } catch (\RuntimeException $e) {
+                // Erro transitório de clock do servidor da prefeitura — tenta novamente
+                if (str_contains($e->getMessage(), 'dhProc') || str_contains($e->getMessage(), 'menor ou igual a agora')) {
+                    $lastError = $e;
+                    AppLogger::warning('dhProc transitório — tentando novamente', [
+                        'invoice_id' => $invoiceId,
+                        'attempt'    => $attempt + 1,
+                        'error'      => $e->getMessage(),
+                    ]);
+                    continue;
+                }
+                throw $e;
+            }
+
+            $status = $response['status'] ?? '';
+
+            if ($status === 'cancelado') {
+                $this->invoiceModel->markCancelled($invoiceId);
+                AppLogger::info('NFS-e cancelada', ['invoice_id' => $invoiceId, 'ref' => $ref, 'attempt' => $attempt + 1]);
+                return $response;
+            }
+
+            if ($status === 'erro_cancelamento') {
+                $erros = $response['erros'] ?? [];
+                $msg   = implode('; ', array_column($erros, 'mensagem'));
+
+                // dhProc é transitório — retentar
+                if (str_contains($msg, 'dhProc') || str_contains($msg, 'menor ou igual a agora')) {
+                    $lastError = new \RuntimeException("Erro ao cancelar NFS-e: $msg");
+                    AppLogger::warning('dhProc transitório (erro_cancelamento) — tentando novamente', [
+                        'invoice_id' => $invoiceId,
+                        'attempt'    => $attempt + 1,
+                    ]);
+                    continue;
+                }
+
+                throw new \RuntimeException("Erro ao cancelar NFS-e: $msg");
+            }
+
+            return $response;
         }
 
-        return $response;
+        // Esgotou as tentativas
+        throw $lastError ?? new \RuntimeException('Falha ao cancelar NFS-e após múltiplas tentativas.');
     }
 
     /**
@@ -268,7 +309,7 @@ final class InvoiceService
         $descricao = $this->buildDescricao($items, $order);
 
         $payload = [
-            'data_emissao'                               => $now->format('Y-m-d\TH:i:sO'),
+            'data_emissao'                               => $now->format('Y-m-d\TH:i:sP'),
             'data_competencia'                           => $now->format('Y-m-d'),
             'codigo_municipio_emissora'                  => (int) self::MUNICIPIO_BLUMENAU,
             'cnpj_prestador'                             => preg_replace('/\D/', '', env('FOCUSNFE_CNPJ_PRESTADOR', '')),

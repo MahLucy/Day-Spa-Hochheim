@@ -247,6 +247,10 @@ export const adminApi = {
     return request('GET', `/admin/invoices/${id}/status`, null, adminCredentials())
   },
 
+  cancelInvoice(id, justificativa) {
+    return request('DELETE', `/admin/invoices/${id}`, { justificativa }, adminCredentials())
+  },
+
   // ── Relatórios ────────────────────────────────────────────────────────────
 
   getRevenueReport(months = 12) {

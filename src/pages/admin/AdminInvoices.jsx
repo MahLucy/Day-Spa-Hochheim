@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { FileText, Download, RefreshCw, Loader2, AlertCircle, Check } from 'lucide-react'
+import { FileText, Download, RefreshCw, Loader2, AlertCircle, Check, XCircle, X } from 'lucide-react'
 import { adminApi, ApiError } from '../../services/api'
 
 function fmtDate(d) {
@@ -20,6 +20,9 @@ export default function AdminInvoices() {
   const [toast, setToast]      = useState('')
   const [reissuing, setReissuing]   = useState(null)
   const [consulting, setConsulting] = useState(null)
+  const [cancelling, setCancelling] = useState(null)
+  const [cancelModal, setCancelModal] = useState(null)   // invoice sendo cancelada
+  const [justificativa, setJustificativa] = useState('')
   const [filters, setFilters]  = useState({ status: '' })
 
   const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(''), 3000) }
@@ -67,11 +70,82 @@ export default function AdminInvoices() {
     }
   }
 
+  const openCancelModal = (invoice) => {
+    setCancelModal(invoice)
+    setJustificativa('')
+  }
+
+  const closeCancelModal = () => {
+    setCancelModal(null)
+    setJustificativa('')
+  }
+
+  const handleCancel = async () => {
+    if (!cancelModal) return
+    if (justificativa.trim().length < 15) {
+      showToast('Justificativa deve ter pelo menos 15 caracteres.')
+      return
+    }
+    setCancelling(cancelModal.id)
+    try {
+      await adminApi.cancelInvoice(cancelModal.id, justificativa.trim())
+      showToast('Nota fiscal cancelada com sucesso.')
+      closeCancelModal()
+      await load()
+    } catch (err) {
+      showToast('Erro: ' + err.message)
+    } finally {
+      setCancelling(null)
+    }
+  }
+
   return (
     <div>
       {toast && (
         <div className="fixed top-6 right-6 z-50 flex items-center gap-2 bg-spa-dark text-white text-sm font-body px-4 py-3 rounded-xl shadow-lg">
           <Check size={14} /> {toast}
+        </div>
+      )}
+
+      {/* Modal de cancelamento */}
+      {cancelModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="font-display text-lg font-bold text-spa-dark">Cancelar Nota Fiscal</h2>
+              <button onClick={closeCancelModal} className="p-1 rounded-lg hover:bg-gray-100 transition-all">
+                <X size={16} className="text-spa-muted" />
+              </button>
+            </div>
+            <p className="text-sm font-body text-spa-muted mb-1">
+              Nota <span className="font-semibold text-spa-dark">#{cancelModal.invoice_number || cancelModal.id}</span> — Pedido <span className="font-semibold text-spa-dark">#{cancelModal.order_id}</span>
+            </p>
+            <p className="text-xs font-body text-red-500 mb-4">
+              Esta ação é <strong>definitiva</strong> e não pode ser desfeita. A nota será cancelada na Focus NFe.
+            </p>
+            <label className="block text-xs font-body font-semibold text-spa-muted uppercase tracking-wider mb-2">
+              Justificativa <span className="text-red-400">*</span>
+            </label>
+            <textarea
+              rows={3}
+              className="input-field text-sm w-full resize-none"
+              placeholder="Descreva o motivo do cancelamento (mínimo 15 caracteres)"
+              value={justificativa}
+              onChange={e => setJustificativa(e.target.value)}
+            />
+            <p className="text-xs text-spa-muted font-body mt-1 text-right">{justificativa.length}/255</p>
+            <div className="flex gap-3 mt-5">
+              <button onClick={closeCancelModal}
+                className="flex-1 text-sm font-body px-4 py-2 rounded-xl border border-gray-200 hover:bg-gray-50 transition-all">
+                Voltar
+              </button>
+              <button onClick={handleCancel} disabled={cancelling === cancelModal.id || justificativa.trim().length < 15}
+                className="flex-1 flex items-center justify-center gap-2 text-sm font-body font-medium bg-red-600 text-white px-4 py-2 rounded-xl hover:bg-red-700 transition-all disabled:opacity-50">
+                {cancelling === cancelModal.id ? <Loader2 size={14} className="animate-spin" /> : <XCircle size={14} />}
+                Cancelar Nota
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
@@ -162,6 +236,13 @@ export default function AdminInvoices() {
                               className="flex items-center gap-1 text-xs font-body font-medium text-spa-mid hover:text-spa-dark px-2 py-1 rounded-lg hover:bg-spa-pale transition-all disabled:opacity-50">
                               {reissuing === inv.id ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
                               Reemitir
+                            </button>
+                          )}
+                          {inv.status === 'issued' && (
+                            <button onClick={() => openCancelModal(inv)}
+                              className="flex items-center gap-1 text-xs font-body font-medium text-red-500 hover:text-red-700 px-2 py-1 rounded-lg hover:bg-red-50 transition-all">
+                              <XCircle size={12} />
+                              Cancelar
                             </button>
                           )}
                         </div>
