@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Search, Mail, ChevronDown, ChevronUp, Loader2, AlertCircle, RefreshCw, Check } from 'lucide-react'
+import { Search, Mail, ChevronDown, ChevronUp, Loader2, AlertCircle, RefreshCw, Check, Clock } from 'lucide-react'
 import { adminApi, ApiError } from '../../services/api'
 
 const STATUS_LABELS = {
@@ -29,6 +29,7 @@ export default function AdminOrders() {
   const [detail, setDetail]    = useState({})
   const [toast, setToast]      = useState('')
   const [resending, setResending] = useState(null)
+  const [expiring, setExpiring]   = useState(false)
 
   const [filters, setFilters]  = useState({ status: '', date_from: '', date_to: '', customer_name: '', recipient_name: '' })
 
@@ -75,6 +76,21 @@ export default function AdminOrders() {
     }
   }
 
+  const handleExpirePending = async () => {
+    if (!window.confirm('Cancelar todos os pedidos pendentes com mais de 24 horas?')) return
+    setExpiring(true)
+    try {
+      const res = await adminApi.expirePendingOrders()
+      const count = res.data?.cancelled_count ?? 0
+      showToast(count > 0 ? `${count} pedido(s) cancelado(s).` : 'Nenhum pedido expirado encontrado.')
+      if (count > 0) load(1)
+    } catch (err) {
+      showToast('Erro: ' + err.message)
+    } finally {
+      setExpiring(false)
+    }
+  }
+
   const lastPage = Math.ceil(total / 20)
 
   return (
@@ -91,9 +107,16 @@ export default function AdminOrders() {
           <h1 className="font-display text-2xl lg:text-3xl text-spa-dark font-bold">Pedidos</h1>
           <p className="text-sm text-spa-muted font-body mt-1">{total} pedido{total !== 1 ? 's' : ''} encontrado{total !== 1 ? 's' : ''}</p>
         </div>
-        <button onClick={() => load(1)} className="flex items-center gap-2 text-sm text-spa-muted hover:text-spa-dark font-body px-3 py-2 rounded-xl hover:bg-gray-100 transition-all">
-          <RefreshCw size={14} /> Atualizar
-        </button>
+        <div className="flex items-center gap-2">
+          <button onClick={handleExpirePending} disabled={expiring}
+            className="flex items-center gap-2 text-sm text-red-500 hover:text-red-700 font-body px-3 py-2 rounded-xl hover:bg-red-50 transition-all disabled:opacity-50">
+            {expiring ? <Loader2 size={14} className="animate-spin" /> : <Clock size={14} />}
+            Cancelar expirados
+          </button>
+          <button onClick={() => load(1)} className="flex items-center gap-2 text-sm text-spa-muted hover:text-spa-dark font-body px-3 py-2 rounded-xl hover:bg-gray-100 transition-all">
+            <RefreshCw size={14} /> Atualizar
+          </button>
+        </div>
       </div>
 
       {/* Filtros */}

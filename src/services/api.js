@@ -221,6 +221,10 @@ export const adminApi = {
     return request('POST', `/admin/orders/${orderId}/resend-email`, null, adminCredentials())
   },
 
+  expirePendingOrders() {
+    return request('POST', '/admin/orders/expire-pending', null, adminCredentials())
+  },
+
   // ── Cartões Presente ──────────────────────────────────────────────────────
 
   getGiftCards(params = {}) {
