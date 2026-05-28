@@ -214,4 +214,30 @@ final class Order
         );
         return (int) $stmt->fetchColumn();
     }
+
+    /**
+     * Cancela pedidos que ficaram em 'pending' por mais de $minutesOld minutos.
+     * Retorna os IDs cancelados.
+     */
+    public function cancelExpired(int $minutesOld = 1440): array
+    {
+        $stmt = $this->pdo->prepare(
+            "SELECT id FROM orders
+             WHERE status = 'pending'
+               AND created_at < NOW() - INTERVAL ? MINUTE"
+        );
+        $stmt->execute([$minutesOld]);
+        $ids = $stmt->fetchAll(\PDO::FETCH_COLUMN);
+
+        if (empty($ids)) {
+            return [];
+        }
+
+        $placeholders = implode(',', array_fill(0, count($ids), '?'));
+        $this->pdo->prepare(
+            "UPDATE orders SET status = 'cancelled' WHERE id IN ({$placeholders})"
+        )->execute($ids);
+
+        return array_map('intval', $ids);
+    }
 }

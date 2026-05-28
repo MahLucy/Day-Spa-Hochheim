@@ -137,6 +137,10 @@ function dispatchAdminRoute(string $method, string $uri): void
         (new \App\Controllers\OrderController())->resendEmail((int) $m[1]);
     }
 
+    if ($method === 'POST' && $adminUri === '/orders/expire-pending') {
+        (new \App\Controllers\AdminController())->expirePending();
+    }
+
     // ── Cartões ───────────────────────────────────────────────────────────────
 
     if ($method === 'GET' && $adminUri === '/giftcards') {

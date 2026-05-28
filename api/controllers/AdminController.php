@@ -43,6 +43,22 @@ final class AdminController
     }
 
     /**
+     * POST /api/admin/orders/expire-pending
+     *
+     * Cancela pedidos 'pending' mais antigos que ?minutes= (padrão: 1440 = 24h).
+     */
+    public function expirePending(): never
+    {
+        $minutes   = max(60, (int) ($_GET['minutes'] ?? 1440));
+        $cancelled = $this->orderModel->cancelExpired($minutes);
+
+        Response::success([
+            'cancelled_count' => count($cancelled),
+            'cancelled_ids'   => $cancelled,
+        ]);
+    }
+
+    /**
      * GET /api/admin/reports/revenue
      *
      * Faturamento por mês nos últimos N meses.
