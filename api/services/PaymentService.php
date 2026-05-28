@@ -57,6 +57,7 @@ final class PaymentService
         $paymentMethodType = $this->resolvePaymentMethodType($paymentMethodId, $formData);
         $token             = $formData['token'] ?? null;
         $installments      = min(3, max(1, isset($formData['installments']) ? (int) $formData['installments'] : 1));
+        $deviceId          = $formData['device_id'] ?? '';
 
         AppLogger::info('processPayment — dados recebidos do frontend', [
             'order_id'            => $orderId,
@@ -67,6 +68,7 @@ final class PaymentService
             'installments'        => $installments,
             'issuer_id'           => $formData['issuer_id'] ?? '(vazio)',
             'has_payer'           => isset($formData['payer']),
+            'has_device_id'       => !empty($deviceId),
         ]);
 
         $paymentEntry = [
@@ -81,7 +83,8 @@ final class PaymentService
             $paymentEntry['payment_method']['token'] = $token;
         }
         if (in_array($paymentMethodType, ['credit_card', 'debit_card'])) {
-            $paymentEntry['payment_method']['installments'] = $installments;
+            $paymentEntry['payment_method']['installments']        = $installments;
+            $paymentEntry['payment_method']['statement_descriptor'] = 'DAY SPA HOCHHEIM';
         }
 
         // Pix: definir expiração de 30 minutos
@@ -99,45 +102,75 @@ final class PaymentService
             }
         }
 
+        $nameParts = explode(' ', trim($order['customer_name'] ?? ''), 2);
+
         // Monta o payload da Orders API
         $orderPayload = [
             'type'               => 'online',
             'processing_mode'    => 'automatic',
             'total_amount'       => $totalAmount,
             'external_reference' => (string) $orderId,
-            'payer'              => ['email' => $payerEmail],
+            'payer'              => [
+                'email'      => $payerEmail,
+                'first_name' => $nameParts[0] ?? '',
+                'last_name'  => $nameParts[1] ?? $nameParts[0] ?? '',
+            ],
             'transactions'       => [
                 'payments' => [$paymentEntry],
             ],
         ];
 
-        // Adiciona identificação do pagador se disponível
+        // Identificação do pagador (CPF)
         if (!empty($payerCpf)) {
             $orderPayload['payer']['identification'] = ['type' => 'CPF', 'number' => $payerCpf];
         } elseif (isset($formData['payer']['identification'])) {
             $orderPayload['payer']['identification'] = $formData['payer']['identification'];
         }
 
-        // Para boleto, adicionar nome completo do pagador (exigido pela Orders API)
-        if ($paymentMethodType === 'ticket') {
-            $nameParts = explode(' ', trim($order['customer_name'] ?? ''), 2);
-            $orderPayload['payer']['first_name'] = $nameParts[0] ?? '';
-            $orderPayload['payer']['last_name']  = $nameParts[1] ?? '';
-        }
-
-        // Para cartão de crédito/débito, habilitar 3DS automático.
-        // O padrão da conta estava em "never", causando rejeições por high_risk.
-        // "auto" deixa o MP acionar 3DS quando o motor de risco julgar necessário.
-        if (in_array($paymentMethodType, ['credit_card', 'debit_card'], true)) {
-            $orderPayload['config'] = [
-                'online' => [
-                    'transaction_security' => ['validation' => 'auto'],
-                ],
+        // Telefone do pagador — melhora a validação antifraude do MP
+        $payerPhone = preg_replace('/\D/', '', $order['customer_phone'] ?? '');
+        if (strlen($payerPhone) >= 10) {
+            $orderPayload['payer']['phone'] = [
+                'area_code' => substr($payerPhone, 0, 2),
+                'number'    => substr($payerPhone, 2),
             ];
         }
 
+        // Endereço do pagador — obrigatório para boleto (Brick coleta automaticamente)
+        if ($paymentMethodType === 'ticket') {
+            $addr = $formData['payer']['address'] ?? [];
+            if (!empty($addr)) {
+                $orderPayload['payer']['address'] = [
+                    'zip_code'      => preg_replace('/\D/', '', $addr['zip_code'] ?? ''),
+                    'street_name'   => $addr['street_name']   ?? '',
+                    'street_number' => $addr['street_number'] ?? '',
+                    'neighborhood'  => $addr['neighborhood']  ?? '',
+                    'city'          => $addr['city']          ?? '',
+                    'state'         => $addr['federal_unit']  ?? $addr['state'] ?? '',
+                ];
+            }
+        }
+
+        // Items do pedido — exigido pelo quality checklist do Mercado Pago
+        $orderItems = $this->orderModel->getItems($orderId);
+        $mpItems    = [];
+        foreach ($orderItems as $item) {
+            $snapshot  = $item['service_snapshot'];
+            $qty       = (int) $item['quantity'];
+            $mpItems[] = [
+                'title'       => $snapshot['name'] ?? 'Serviço de Spa',
+                'category_id' => 'services',
+                'quantity'    => $qty,
+                'unit_price'  => number_format((float) $item['unit_price'], 2, '.', ''),
+            ];
+        }
+        if (!empty($mpItems)) {
+            $orderPayload['items'] = $mpItems;
+        }
+
+
         try {
-            $response = $this->callOrdersApi('POST', '/v1/orders', $orderPayload);
+            $response = $this->callOrdersApi('POST', '/v1/orders', $orderPayload, $deviceId);
 
             $mpOrderId    = $response['id'] ?? '';
             $mpStatus     = $response['status'] ?? 'unknown';
@@ -180,13 +213,25 @@ final class PaymentService
                 return ['status' => 'approved', 'payment_id' => $mpPaymentId];
             }
 
-            // Pagamento pendente (PIX, boleto, etc.)
+            // Pagamento pendente (PIX, boleto, 3DS challenge, etc.)
             if ($mpStatus === 'action_required' || $payStatus === 'action_required') {
                 $this->paymentModel->updateStatus($paymentDbId, 'pending', $response);
 
-                $result = ['status' => 'pending', 'payment_id' => $mpPaymentId];
+                $result = ['status' => 'pending', 'payment_id' => $mpPaymentId, 'order_id' => $mpOrderId];
 
                 $pm = $response['transactions']['payments'][0]['payment_method'] ?? [];
+
+                // 3DS Challenge — cartão de crédito/débito com validação pendente
+                $ts = $pm['transaction_security'] ?? [];
+                if (!empty($ts['validation_url'])) {
+                    $result['three_ds_url'] = $ts['validation_url'];
+                    AppLogger::info('3DS Challenge requerido (Orders API)', [
+                        'order_id'       => $orderId,
+                        'mp_order_id'    => $mpOrderId,
+                        'validation_url' => $ts['validation_url'],
+                    ]);
+                    return $result;
+                }
 
                 // Dados de PIX
                 if (!empty($pm['qr_code'])) {
@@ -323,24 +368,44 @@ final class PaymentService
             throw new \RuntimeException("Pedido não está em estado pendente.");
         }
 
-        $items = $this->orderModel->getItems($orderId);
-        $mpItems = [];
+        $items     = $this->orderModel->getItems($orderId);
+        $nameParts = explode(' ', trim($order['customer_name'] ?? ''), 2);
+        $mpItems   = [];
         foreach ($items as $item) {
-            $snapshot = $item['service_snapshot'];
+            $snapshot  = $item['service_snapshot'];
             $mpItems[] = [
                 'id'          => (string) $item['service_id'],
                 'title'       => $snapshot['name'] ?? 'Serviço de Spa',
-                'description' => $snapshot['description'] ?? '',
+                'description' => $snapshot['description'] ?? 'Gift Card Day Spa Hochheim',
+                'category_id' => 'services',
                 'quantity'    => (int) $item['quantity'],
                 'unit_price'  => (float) $item['unit_price'],
                 'currency_id' => 'BRL',
             ];
         }
 
+        $prefCpf   = preg_replace('/\D/', '', $order['customer_cpf'] ?? '');
+        $prefPhone = preg_replace('/\D/', '', $order['customer_phone'] ?? '');
+
+        $payerData = [
+            'name'    => $nameParts[0] ?? $order['customer_name'],
+            'surname' => $nameParts[1] ?? '',
+            'email'   => $order['customer_email'],
+        ];
+        if (!empty($prefCpf)) {
+            $payerData['identification'] = ['type' => 'CPF', 'number' => $prefCpf];
+        }
+        if (strlen($prefPhone) >= 10) {
+            $payerData['phone'] = [
+                'area_code' => substr($prefPhone, 0, 2),
+                'number'    => substr($prefPhone, 2),
+            ];
+        }
+
         $backUrl = rtrim(env('APP_URL', 'https://hochheim.com.br'), '/');
         $preferenceData = [
             'items'       => $mpItems,
-            'payer'       => ['name' => $order['customer_name'], 'email' => $order['customer_email']],
+            'payer'       => $payerData,
             'back_urls'   => [
                 'success' => "{$backUrl}/confirmacao",
                 'failure' => "{$backUrl}/confirmacao",
@@ -384,7 +449,7 @@ final class PaymentService
     /**
      * Chamada HTTP direta à API do Mercado Pago (Orders API).
      */
-    private function callOrdersApi(string $method, string $endpoint, array $body = null): array
+    private function callOrdersApi(string $method, string $endpoint, array $body = null, string $deviceId = ''): array
     {
         $url = 'https://api.mercadopago.com' . $endpoint;
 
@@ -393,6 +458,10 @@ final class PaymentService
             'Authorization: Bearer ' . $this->accessToken,
             'X-Idempotency-Key: ' . $this->generateIdempotencyKey(),
         ];
+
+        if (!empty($deviceId)) {
+            $headers[] = 'X-meli-session-id: ' . $deviceId;
+        }
 
         $ch = curl_init($url);
         curl_setopt_array($ch, [
