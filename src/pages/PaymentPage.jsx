@@ -36,8 +36,9 @@ export default function PaymentPage() {
   const alive               = useRef(true)
   const bootIdRef           = useRef(0)   // incremented each boot; lets stale boots self-cancel
   const [orderId, setOrderId] = useState(null)
-  const [pixData, setPixData]   = useState(null) // { qr_code, qr_code_base64, order_id }
+  const [pixData, setPixData]     = useState(null) // { qr_code, qr_code_base64, order_id }
   const [pixCopied, setPixCopied] = useState(false)
+  const [threeDsOrderId, setThreeDsOrderId] = useState(null)
 
   useEffect(() => {
     alive.current = true
@@ -65,6 +66,22 @@ export default function PaymentPage() {
     }, 5000)
     return () => clearInterval(interval)
   }, [phase, pixData, clearCart])
+
+  // Polls every 5s while 3DS challenge is open in popup.
+  // Webhook fires when buyer completes 3DS; gift card will exist when approved.
+  useEffect(() => {
+    if (phase !== 'three-ds-pending' || !threeDsOrderId) return
+    const interval = setInterval(async () => {
+      try {
+        await api.getOrderGiftCard(threeDsOrderId)
+        clearCart()
+        window.location.href = `/confirmacao?status=approved&external_reference=${threeDsOrderId}`
+      } catch {
+        // 404 = still waiting; ignore and keep polling
+      }
+    }, 5000)
+    return () => clearInterval(interval)
+  }, [phase, threeDsOrderId, clearCart])
 
   useEffect(() => {
     if (items.length === 0) return void navigate('/carrinho', { replace: true })
@@ -139,8 +156,6 @@ export default function PaymentPage() {
         customization: {
           paymentMethods: {
             creditCard:      'all',
-            debitCard:       'all',
-            ticket:          'all', // boleto
             bankTransfer:    'all', // PIX
             maxInstallments: 3,
             minInstallments: 1,
@@ -208,6 +223,7 @@ export default function PaymentPage() {
                 order_id: storedOrderId,
                 ...formData,
                 payment_type: resolvedPaymentType,
+                device_id: window.MP_DEVICE_SESSION_ID ?? '',
               }
               console.log('[Payment] Enviando para /payments/process:', {
                 order_id:          payload.order_id,
@@ -233,7 +249,14 @@ export default function PaymentPage() {
                 clearCart()
                 window.location.href = `/confirmacao?status=approved&external_reference=${storedOrderId}`
               } else if (payStatus === 'pending') {
-                if (payResp.data?.qr_code) {
+                if (payResp.data?.three_ds_url) {
+                  // 3DS Challenge — open in popup; poll for approval via webhook
+                  window.open(payResp.data.three_ds_url, '_blank', 'width=600,height=700,noopener,noreferrer')
+                  setThreeDsOrderId(storedOrderId)
+                  brickRef.current?.unmount?.()
+                  brickRef.current = null
+                  setPhase('three-ds-pending')
+                } else if (payResp.data?.qr_code) {
                   // PIX — show QR code inline; unmount brick to avoid MP SVG render errors
                   setPixData({
                     qr_code:        payResp.data.qr_code,
@@ -375,7 +398,7 @@ export default function PaymentPage() {
             {/* Container do Brick — sempre no DOM para o SDK montar */}
             <div
               id="mp-brick-container"
-              className={phase === 'loading' || phase === 'pix-pending' ? 'h-0 overflow-hidden' : ''}
+              className={['loading', 'pix-pending', 'three-ds-pending'].includes(phase) ? 'h-0 overflow-hidden' : ''}
             />
 
             {/* PIX — QR Code inline */}
@@ -431,6 +454,31 @@ export default function PaymentPage() {
                   <p className="text-xs font-body text-amber-700">
                     Aguardando confirmação do pagamento… Esta página atualiza automaticamente.
                   </p>
+                </div>
+              </div>
+            )}
+
+            {/* 3DS Challenge — autenticação pendente no popup */}
+            {phase === 'three-ds-pending' && (
+              <div className="bg-white rounded-2xl p-6 shadow-card border border-blue-100">
+                <div className="flex items-center gap-2 mb-5">
+                  <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center shrink-0">
+                    <Lock size={16} className="text-blue-600" />
+                  </div>
+                  <div>
+                    <p className="font-body font-semibold text-spa-dark text-sm">Autenticação do banco necessária</p>
+                    <p className="text-xs text-spa-muted font-body">Uma janela do banco foi aberta para verificar sua identidade</p>
+                  </div>
+                </div>
+                <div className="p-4 bg-blue-50 border border-blue-100 rounded-xl text-sm font-body text-blue-800 leading-relaxed mb-4">
+                  <strong>Como concluir:</strong> Complete a verificação na janela que foi aberta pelo seu banco (pode ser um código SMS, biometria ou senha). Esta página aguardará a confirmação automaticamente.
+                </div>
+                <div className="flex items-center gap-2 p-3 bg-amber-50 border border-amber-100 rounded-xl">
+                  <svg className="animate-spin w-3.5 h-3.5 shrink-0 text-amber-500" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+                  </svg>
+                  <p className="text-xs font-body text-amber-700">Aguardando confirmação… Esta página atualiza automaticamente.</p>
                 </div>
               </div>
             )}
