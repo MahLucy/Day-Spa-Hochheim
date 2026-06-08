@@ -25,6 +25,21 @@ function loadMPSdk() {
   })
 }
 
+/**
+ * Carrega o script de device fingerprint do Mercado Pago.
+ * Popula window.MP_DEVICE_SESSION_ID — usado como header X-meli-session-id
+ * na Orders API para o motor antifraude identificar o dispositivo do comprador.
+ * Independente do Payment Brick (que só faz fingerprint interno no token).
+ */
+function loadMPFingerprint() {
+  if (document.getElementById('mp-fingerprint-script')) return
+  const script = document.createElement('script')
+  script.id  = 'mp-fingerprint-script'
+  script.src = 'https://www.mercadopago.com/v2/security.js'
+  script.setAttribute('view', 'checkout')
+  document.head.appendChild(script)
+}
+
 const isDev = import.meta.env.VITE_APP_ENV === 'development'
 
 export default function PaymentPage() {
@@ -106,6 +121,7 @@ export default function PaymentPage() {
 
     try {
       await loadMPSdk()
+      loadMPFingerprint() // carrega fingerprint em paralelo — não bloqueia o Brick
       if (isStale()) { console.log(`[Payment] boot #${myBootId} cancelado após loadMPSdk`); return }
 
       let currentOrderId = orderId
@@ -191,6 +207,7 @@ export default function PaymentPage() {
             console.log('issuer_id:', formData?.issuer_id)
             console.log('has token:', !!formData?.token)
             console.log('tracks:', formData?.tracks)
+            console.log('device_id (MP_DEVICE_SESSION_ID):', window.MP_DEVICE_SESSION_ID ?? '(vazio — fingerprint ainda carregando?)')
             console.groupEnd()
 
             try {

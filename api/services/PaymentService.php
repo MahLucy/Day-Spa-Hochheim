@@ -85,6 +85,8 @@ final class PaymentService
         if (in_array($paymentMethodType, ['credit_card', 'debit_card'])) {
             $paymentEntry['payment_method']['installments']        = $installments;
             $paymentEntry['payment_method']['statement_descriptor'] = 'DAY SPA HOCHHEIM';
+            // Nota: issuer_id não é aceito pela Orders API (v1/orders) como
+            // additionalProperty em payment_method — usado apenas na Payments API.
         }
 
         // Pix: definir expiração de 30 minutos
@@ -104,36 +106,61 @@ final class PaymentService
 
         $nameParts = explode(' ', trim($order['customer_name'] ?? ''), 2);
 
-        // Monta o payload da Orders API
+        // Monta o payload da Orders API.
+        // IMPORTANTE: para Pix (bank_transfer), a documentação oficial só aceita payer.email.
+        // Campos extras (first_name, last_name, identification, phone) causam processing_error no Pix.
+        // Para cartão e boleto, enviamos o payer completo pois o antifraude se beneficia dos dados.
+        $isPixPayment = ($paymentMethodType === 'bank_transfer');
+
+        $payerData = ['email' => $payerEmail];
+
+        if (!$isPixPayment) {
+            $payerData['first_name'] = $nameParts[0] ?? '';
+            $payerData['last_name']  = $nameParts[1] ?? $nameParts[0] ?? '';
+        }
+
         $orderPayload = [
             'type'               => 'online',
             'processing_mode'    => 'automatic',
             'total_amount'       => $totalAmount,
             'external_reference' => (string) $orderId,
-            'payer'              => [
-                'email'      => $payerEmail,
-                'first_name' => $nameParts[0] ?? '',
-                'last_name'  => $nameParts[1] ?? $nameParts[0] ?? '',
-            ],
+            'payer'              => $payerData,
             'transactions'       => [
                 'payments' => [$paymentEntry],
             ],
         ];
 
-        // Identificação do pagador (CPF)
-        if (!empty($payerCpf)) {
-            $orderPayload['payer']['identification'] = ['type' => 'CPF', 'number' => $payerCpf];
-        } elseif (isset($formData['payer']['identification'])) {
-            $orderPayload['payer']['identification'] = $formData['payer']['identification'];
+        // config.online.transaction_security é exclusivo para cartão de crédito/débito (3DS).
+        // Não deve ser enviado para Pix, boleto ou outros métodos — causa processing_error.
+        if (in_array($paymentMethodType, ['credit_card', 'debit_card'], true)) {
+            $orderPayload['config'] = [
+                'online' => [
+                    'transaction_security' => [
+                        'validation'      => 'on_fraud_risk',
+                        'liability_shift' => 'required',
+                    ],
+                ],
+            ];
         }
 
-        // Telefone do pagador — melhora a validação antifraude do MP
-        $payerPhone = preg_replace('/\D/', '', $order['customer_phone'] ?? '');
-        if (strlen($payerPhone) >= 10) {
-            $orderPayload['payer']['phone'] = [
-                'area_code' => substr($payerPhone, 0, 2),
-                'number'    => substr($payerPhone, 2),
-            ];
+        // Identificação do pagador (CPF) — apenas para cartão e boleto
+        if (!$isPixPayment) {
+            if (!empty($payerCpf)) {
+                $orderPayload['payer']['identification'] = ['type' => 'CPF', 'number' => $payerCpf];
+            } elseif (isset($formData['payer']['identification'])) {
+                $orderPayload['payer']['identification'] = $formData['payer']['identification'];
+            }
+        }
+
+        // Telefone do pagador — apenas para cartão e boleto (melhora antifraude)
+        if (!$isPixPayment) {
+            $payerPhone = preg_replace('/\D/', '', $order['customer_phone'] ?? '');
+            if (strlen($payerPhone) >= 10) {
+                $orderPayload['payer']['phone'] = [
+                    'area_code' => substr($payerPhone, 0, 2),
+                    'number'    => substr($payerPhone, 2),
+                ];
+            }
         }
 
         // Endereço do pagador — obrigatório para boleto (Brick coleta automaticamente)
@@ -151,21 +178,26 @@ final class PaymentService
             }
         }
 
-        // Items do pedido — exigido pelo quality checklist do Mercado Pago
-        $orderItems = $this->orderModel->getItems($orderId);
-        $mpItems    = [];
-        foreach ($orderItems as $item) {
-            $snapshot  = $item['service_snapshot'];
-            $qty       = (int) $item['quantity'];
-            $mpItems[] = [
-                'title'       => $snapshot['name'] ?? 'Serviço de Spa',
-                'category_id' => 'services',
-                'quantity'    => $qty,
-                'unit_price'  => number_format((float) $item['unit_price'], 2, '.', ''),
-            ];
-        }
-        if (!empty($mpItems)) {
-            $orderPayload['items'] = $mpItems;
+        // Items do pedido — exigido pelo quality checklist do Mercado Pago.
+        // ATENÇÃO: para Pix, a documentação oficial NÃO inclui items no payload.
+        // Enviar items para Pix pode causar processing_error internamente no MP.
+        if (!$isPixPayment) {
+            $orderItems = $this->orderModel->getItems($orderId);
+            $mpItems    = [];
+            foreach ($orderItems as $item) {
+                $snapshot  = $item['service_snapshot'];
+                $qty       = (int) $item['quantity'];
+                $mpItems[] = [
+                    'title'       => $snapshot['name'] ?? 'Serviço de Spa',
+                    'description' => $snapshot['description'] ?? ($snapshot['name'] ?? 'Serviço de Spa'),
+                    'category_id' => 'services',
+                    'quantity'    => $qty,
+                    'unit_price'  => number_format((float) $item['unit_price'], 2, '.', ''),
+                ];
+            }
+            if (!empty($mpItems)) {
+                $orderPayload['items'] = $mpItems;
+            }
         }
 
 
@@ -483,6 +515,16 @@ final class PaymentService
             ]);
         }
 
+        // Captura headers da resposta para obter x-request-id (necessário para suporte MP)
+        $responseHeaders = [];
+        curl_setopt($ch, CURLOPT_HEADERFUNCTION, function ($ch, $header) use (&$responseHeaders) {
+            $parts = explode(':', $header, 2);
+            if (count($parts) === 2) {
+                $responseHeaders[strtolower(trim($parts[0]))] = trim($parts[1]);
+            }
+            return strlen($header);
+        });
+
         $rawResponse = curl_exec($ch);
         $httpCode    = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         $curlError   = curl_error($ch);
@@ -498,7 +540,8 @@ final class PaymentService
         }
 
         AppLogger::info('Orders API response', [
-            'http_code' => $httpCode,
+            'http_code'    => $httpCode,
+            'x-request-id' => $responseHeaders['x-request-id'] ?? $responseHeaders['x-requestid'] ?? null,
             'response'  => $response,
         ]);
 
